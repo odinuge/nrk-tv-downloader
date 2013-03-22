@@ -151,6 +151,7 @@ function download(){
 	printf 'Elapsed time: %s\n' $(timer $t)
 
 }
+
 # Download program from url $1, to a local file $2 (if provided)
 function program(){
 	local URL=$1
@@ -194,7 +195,7 @@ function program(){
 			exit 1
 		fi
 		PARTS=false
-	else	
+	else
 		# Several parts
 		PARTS=true
 	fi
@@ -206,7 +207,7 @@ function program(){
 				gsub( ".*content=\"", "" );
   	     			gsub( "\".*", "" );
        				print;
-    			}' RS="[<>]"`		
+    			}' RS="[<>]"`
 		else
 			FILE=$LOCAL_FILE
 		fi
@@ -218,7 +219,7 @@ function program(){
 		else
 			FILE="${FILE// /_}"
 		fi
-		# Replace (bad) chars		
+
 		FILE="${FILE//&#230;/æ}"
 		FILE="${FILE//&#216;/ø}"
 		FILE="${FILE//&#229;/å}"
@@ -232,7 +233,7 @@ function program(){
 }
 
 COMMAND=$1
-# "Main".....
+# Main part of script
 case $COMMAND in
 	stream)
 		download $2 $3
@@ -244,3 +245,5 @@ case $COMMAND in
 		usage
 	;;
 esac
+
+# The End!
