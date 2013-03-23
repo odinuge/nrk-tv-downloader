@@ -20,7 +20,7 @@
 #   0. You just DO WHAT THE FUCK YOU WANT TO.
 #
 
-VERSION="0.4.5"
+VERSION="0.4.7"
 DEPS="sed awk printf curl"
 DRY_RUN=false
 

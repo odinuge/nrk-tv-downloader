@@ -9,7 +9,7 @@ Because the script relies on "HTML-Parsing" it can break at any time.
 
 This script may be useful for those who are struggeling with low bandwidth and/or bad playback performance.
 
-Current version: 0.4.5 
+Current version: 0.4.7
 
 Usage
 ======================
