@@ -63,9 +63,6 @@ function timer()
 # Print USAGE
 function usage() {
 	echo -e "NRK-TV-Downloader v$VERSION"
-	echo -e "Odin Ugedal - odinuge[at]gmail[dot]com"
-	echo -e "This script has nothing to do with NRK!"
-	echo -e "It is only meant for private use, and can break at any time."
 	echo -e "\nUsage: \e[01;32m$0 COMMAND [PARAMETERS]...\e[00m"
 	echo -e "\nCommands:"
 	echo -e "\t stream [HLS_STREAM] [LOCAL_FILE]"
