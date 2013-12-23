@@ -28,7 +28,7 @@ Usage
 
 Requirements
 ======================
-This script requires simple bash, sed, awk, printf and curl.
+This script requires simple bash, sed, awk, tail, printf and curl.
 
 License
 ======================
