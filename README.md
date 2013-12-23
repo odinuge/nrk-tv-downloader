@@ -9,26 +9,26 @@ Because the script relies on "HTML-Parsing" it can break at any time.
 
 This script may be useful for those who are struggeling with low bandwidth and/or bad playback performance.
 
-Current version: 0.4.7
+Current version: 0.5.0
 
 Usage
 ======================
     chmod +x NRK-TV-Downloader.sh
     [...]
-    Usage: ./NRK-TV-Downloader.sh COMMAND [PARAMETERS]...
+    Usage: ./NRK-TV-Downloader.sh [PARAMETERS]...
 
     Commands:
-        stream [HLS_STREAM] [LOCAL_FILE]
-        program [PROGRAM_URL] <LOCAL_FILE>
+        [HLS_STREAM] [LOCAL_FILE]
+        [PROGRAM_URL] <LOCAL_FILE>
         help 
 
     Example: 
-    $ ./NRK-TV-Downloader.sh program http://tv.nrk.no/serie/tore-paa-sporet/dmpf71005710/17-02-2013 
+    $ ./NRK-TV-Downloader.sh http://tv.nrk.no/serie/tore-paa-sporet/dmpf71005710/17-02-2013
 	
 
 Requirements
 ======================
-This script requires simple bash, sed, awk, printf and curl.
+This script requires simple bash, sed, awk, tail, printf and curl.
 
 License
 ======================

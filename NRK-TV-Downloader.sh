@@ -19,9 +19,12 @@
 #
 #   0. You just DO WHAT THE FUCK YOU WANT TO.
 #
+# Contributors:
+# Henrik Lilleengen <mail[at]ithenrik[dot]com>
+#
 
-VERSION="0.4.7"
-DEPS="sed awk printf curl"
+VERSION="0.5.0"
+DEPS="sed awk tail printf curl"
 DRY_RUN=false
 
 # Check the shell
@@ -65,8 +68,8 @@ function usage() {
 	echo -e "NRK-TV-Downloader v$VERSION"
 	echo -e "\nUsage: \e[01;32m$0 COMMAND [PARAMETERS]...\e[00m"
 	echo -e "\nCommands:"
-	echo -e "\t stream [HLS_STREAM] [LOCAL_FILE]"
-	echo -e "\t program [PROGRAM_URL] <LOCAL_FILE>"
+	echo -e "\t [HLS_STREAM] [LOCAL_FILE]"
+	echo -e "\t [PROGRAM_URL] <LOCAL_FILE>"
 	echo -e "\t help"
 	echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
 	exit 1
@@ -226,14 +229,14 @@ function program(){
 
 }
 
-COMMAND=$1
+DOMAIN="$(echo $1|awk -F/ '{print $3}'|tail -c 13)"
 # Main part of script
-case $COMMAND in
-	stream)
-		download $2 $3
+case $DOMAIN in
+	akamaihd.net)
+		download $1 $2
 	;;
-	program)
-		program $2 $3
+	tv.nrk.no)
+		program $1 $2
 	;;
 	*)
 		usage
