@@ -1,7 +1,7 @@
 NRK-TV-Downloader
 ======================
 This is just another simple shell-script that dumps HLS video streams from NRK-TV into a h264-MPEG-4 container.
-A HLS streams is just a bunch of short files, and this script downloads each piece via Curl into one single file. 
+The script is using ffmpeg, or curl as a fallback (not the best option) 
 This script has nothing to do with NRK!
 It is only meant for private use, and I am not responsible for anyone's use of it. 
 Because the script relies on "HTML-Parsing" it can break at any time.

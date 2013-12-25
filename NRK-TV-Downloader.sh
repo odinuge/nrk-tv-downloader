@@ -47,6 +47,21 @@ for dep in $DEPS; do
     fi
 done
 
+DOWNLOADER_BIN="curl"
+DOWNLOADERS="ffmpeg avconv"
+
+# Check for ffmpeg or avconv
+for downloader in $DOWNLOADERS; do
+    if hash $downloader 2>/dev/null; then
+        DOWNLOADER_BIN=$downloader
+    fi
+done
+
+# Check if fallback is used
+if [[ $downloader == "curl" ]]; then
+    echo "Ffmpeg or avconv not found, using fallback (curl)."
+fi
+
 # Function to measure time
 function timer()
 {
@@ -86,11 +101,6 @@ function download(){
 	local STREAM=$1
 	local LOCAL_FILE=$2
 
-	if $DRY_RUN ; then
-		echo "DOWNLOADING: $LOCAL_FILE, FROM: $STREAM"
-		return
-	fi
-
 
 	if [ -z $STREAM ] ; then
 		echo -e  "No stream provided"
@@ -129,6 +139,11 @@ function download(){
 
 	fi
 
+	if $DRY_RUN ; then
+		echo "DOWNLOADING: $LOCAL_FILE, FROM: $STREAM, with $DOWNLOADER_BIN"
+		return
+	fi
+
 	echo -e "\e[01;32mDownloading stream to \"$LOCAL_FILE\"\e[00m"
 
 	t=$(timer)
@@ -141,17 +156,21 @@ function download(){
 		fi
 	done
 
-	# Download each part into one file
-	for line in $playlist ; do
-		if [[ "$line" == *http* ]]; then
-			current=$((current+1))
-			echo -e "\e[01;32mDownloading part ${current} of ${total}\e[00m"
-			curl $line >> $LOCAL_FILE
-		fi
-	done
-	echo -e "\"$LOCAL_FILE\" downloaded..."
-	printf 'Elapsed time: %s\n' $(timer $t)
-
+    if [[ "$DOWNLOADER_BIN" == "curl" ]]; then
+        # Download each part into one file
+        for line in $playlist ; do
+            if [[ "$line" == *http* ]]; then
+                current=$((current+1))
+                echo -e "\e[01;32mDownloading part ${current} of ${total}\e[00m"
+                curl $line >> $LOCAL_FILE
+            fi
+        done
+        echo -e "\"$LOCAL_FILE\" downloaded..."
+    else
+        echo "Downloading via $DOWNLOADER_BIN"
+        $DOWNLOADER_BIN -i $STREAM -c copy -bsf:a aac_adtstoasc $LOCAL_FILE
+        printf 'Elapsed time: %s\n' $(timer $t)
+    fi
 }
 
 # Download program from url $1, to a local file $2 (if provided)
