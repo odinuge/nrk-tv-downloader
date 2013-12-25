@@ -129,13 +129,13 @@ function download(){
 	# if it is flash, change url to HLS
 	if [[ $STREAM == *manifest.f4m ]]; then
 		#Replacing char(s)
-		STREAM=`echo $STREAM | sed -e 's/z/i/g'`
-		STREAM=`echo $STREAM | sed -e 's/manifest.f4m/master.m3u8/g'`
+		STREAM=$(echo $STREAM | sed -e 's/z/i/g')
+		STREAM=$(echo $STREAM | sed -e 's/manifest.f4m/master.m3u8/g')
 	fi
 
 	# See if the stream is the master playlist
 	if [[ "$STREAM" == *master.m3u8 ]]; then
-		STREAM=`echo $STREAM | sed -e "s/master.m3u8/index_4_av.m3u8/g"`
+		STREAM=$(echo $STREAM | sed -e "s/master.m3u8/index_4_av.m3u8/g")
 
 	fi
 
@@ -148,7 +148,7 @@ function download(){
 
 	t=$(timer)
 
-	playlist=`curl ${STREAM}`
+	playlist=$(curl ${STREAM})
 
 	for line in $playlist ; do
 		if [[ "$line" == *http* ]]; then
@@ -180,27 +180,27 @@ function program(){
 
 	echo -e "\e[01;32mFetching stream url\e[00m"
 
-	HTML=`curl $URL`
+	HTML=$(curl $URL)
 
 	# See if program has more than one part
-	STREAMS=`echo $HTML | awk '
+	STREAMS=$(echo $HTML | awk '
     	/a href="#" class="p-link js-player"/ {
 		gsub( ".*data-argument=\"", "" );
        		gsub( "\".*", "" );
 		print;
 	}
-	' RS="[<>]"`
+	' RS="[<>]")
 
 	if [[ -z $STREAMS ]]; then
 		# Only one part
 
-		STREAMS=`echo $HTML | awk '
+		STREAMS=$(echo $HTML | awk '
     		/div id="playerelement"/ {
 			gsub( ".*data-media=\"", "" );
   		     	gsub( "\".*", "" );
      	  		print;
     		}
-		' RS="[<>]"`
+		' RS="[<>]")
 
 		# If stream is unable to be found,
 		# make the user use "stream"
@@ -218,12 +218,12 @@ function program(){
 	# Download the stream(s)
 	for STREAM in $STREAMS ; do
 		if [ -z $LOCAL_FILE ]; then
-			FILE=`echo $HTML | awk '
+			FILE=$(echo $HTML | awk '
     			/meta name="title"/ {
 				gsub( ".*content=\"", "" );
   	     			gsub( "\".*", "" );
        				print;
-    			}' RS="[<>]"`
+				}' RS="[<>]")
 		else
 			FILE=$LOCAL_FILE
 		fi
