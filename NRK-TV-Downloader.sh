@@ -248,9 +248,8 @@ function program(){
 
 }
 
-DOMAIN=$1
 # Main part of script
-case $DOMAIN in
+case $1 in
 	*akamaihd.net*)
 		download $1 $2
 	;;
