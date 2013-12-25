@@ -29,7 +29,7 @@
 #
 
 VERSION="0.5.0"
-DEPS="sed awk tail printf curl"
+DEPS="sed awk printf curl"
 DRY_RUN=false
 
 # Check the shell
@@ -40,7 +40,7 @@ fi
 
 # Checking dependencies
 for dep in $DEPS; do
-    which $dep > /dev/null
+    hash $dep > /dev/null
     if [ $? -ne 0 ]; then
         echo -e "Error: Required program could not be found: $dep"
         exit 1
@@ -178,11 +178,6 @@ function program(){
 	local URL=$1
 	local LOCAL_FILE=$2
 
-	if [[ $URL != *tv.nrk.no* ]]; then
-		echo -e  "Invalid url."
-		exit 1
-	fi
-
 	echo -e "\e[01;32mFetching stream url\e[00m"
 
 	HTML=`curl $URL`
@@ -212,7 +207,7 @@ function program(){
 		if [ -z $STREAMS ]; then
 			echo -e "Unable to find stream..."
 			echo -e "If url is valid; check for updates at <https://github.com/odinuge/NRK-TV-Downloader>,"
-			echo -e "or use:\e[01;32m $0 stream [HLS_STREAM] [LOCAL_FILE]\e[00m instead."
+			echo -e "or use:\e[01;32m $0 [HLS_STREAM] [LOCAL_FILE]\e[00m instead."
 			exit 1
 		fi
 		PARTS=false
@@ -245,7 +240,7 @@ function program(){
 		FILE="${FILE//&#216;/ø}"
 		FILE="${FILE//&#229;/å}"
 		FILE="${FILE//:/-}"
-		if [[ $FILE != *.mp4 ]]; then
+		if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
 			FILE="${FILE}.mp4"
 		fi
 		download $STREAM $FILE
@@ -253,13 +248,12 @@ function program(){
 
 }
 
-DOMAIN="$(echo $1|awk -F/ '{print $3}'|tail -c 13)"
 # Main part of script
-case $DOMAIN in
-	akamaihd.net)
+case $1 in
+	*akamaihd.net*)
 		download $1 $2
 	;;
-	tv.nrk.no)
+	*tv.nrk.no*)
 		program $1 $2
 	;;
 	*)
