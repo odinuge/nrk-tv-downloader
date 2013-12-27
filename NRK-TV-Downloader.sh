@@ -29,7 +29,7 @@
 #
 
 VERSION="0.5.0"
-DEPS="sed awk printf curl"
+DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
 
 # Check the shell
@@ -218,12 +218,15 @@ function program(){
 	# Download the stream(s)
 	for STREAM in $STREAMS ; do
 		if [ -z $LOCAL_FILE ]; then
-			FILE=$(echo $HTML | awk '
-    			/meta name="title"/ {
+			Program_ID=$(echo $HTML | awk '
+    			/meta name="programid"/ {
 				gsub( ".*content=\"", "" );
   	     			gsub( "\".*", "" );
        				print;
 				}' RS="[<>]")
+
+            FILE=$(curl "http://v7.psapi.nrk.no/mediaelement/${Program_ID}" | \
+            grep -Po '"fullTitle":.*?[^\\]",' | cut -c 14- | rev | cut -c 3- | rev)
 		else
 			FILE=$LOCAL_FILE
 		fi
