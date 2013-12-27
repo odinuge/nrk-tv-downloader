@@ -184,10 +184,10 @@ function program(){
 
 	# See if program has more than one part
 	STREAMS=$(echo $HTML | awk '
-    	/a href="#" class="p-link js-player"/ {
-		gsub( ".*data-argument=\"", "" );
+		/data-method="playStream"/ {
+		    gsub( ".*data-argument=\"", "" );
        		gsub( "\".*", "" );
-		print;
+		    print;
 	}
 	' RS="[<>]")
 
