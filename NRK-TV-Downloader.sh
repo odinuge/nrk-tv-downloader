@@ -28,7 +28,7 @@
 # Henrik Lilleengen <mail@ithenrik.com>
 #
 
-VERSION="0.5.0"
+VERSION="0.9.0"
 DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
 
@@ -37,6 +37,9 @@ if [ -z "$BASH_VERSION" ]; then
 	echo -e "This script needs bash"
 	exit 1
 fi
+
+# Curl flags (for making it silent)
+CURL_="-s"
 
 # Checking dependencies
 for dep in $DEPS; do
@@ -49,6 +52,7 @@ done
 
 DOWNLOADER_BIN="curl"
 DOWNLOADERS="ffmpeg avconv"
+
 
 # Check for ffmpeg or avconv
 for downloader in $DOWNLOADERS; do
@@ -86,13 +90,19 @@ function timer()
 # Print USAGE
 function usage() {
 	echo -e "NRK-TV-Downloader v$VERSION"
-	echo -e "\nUsage: \e[01;32m$0 COMMAND [PARAMETERS]...\e[00m"
-	echo -e "\nCommands:"
-	echo -e "\t [HLS_STREAM] [LOCAL_FILE]"
-	echo -e "\t [PROGRAM_URL] <LOCAL_FILE>"
-	echo -e "\t help"
+    echo -e "\nUsage: \e[01;32m$0 <OPTION>... [PROGRAM_URL(s)]...\e[00m"
+	echo -e "\nOptions:"
+	echo -e "\t -a download all episodes, in all seasons."
+	echo -e "\t -s download all episodes in season"
+    echo -e "\t -v print version"
+	echo -e "\t -h print this\n"
 	echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
-	exit 1
+}
+
+# Get the filesize of a file
+function getfilesize(){
+    local FILE=$1
+    du -h $FILE | awk '{print $1}'
 }
 
 # Download a stream $1, to a local file $2
@@ -113,15 +123,17 @@ function download(){
 	fi
 
 	if [ -f $LOCAL_FILE ]; then
-		echo -e "$LOCAL_FILE exists, overwrite? [Y/n]:"
-		read ans
-
-		if [ $ans = 'y' ]; then
+		echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
+        read -n 1 ans
+        echo
+        if [ -z $ans ]; then
+            return
+		elif [ $ans = 'y' ]; then
 			rm $LOCAL_FILE
 		elif [ $ans = 'Y' ]; then
 			rm $LOCAL_FILE
 		else
-			exit 1
+			return
 		fi
 	fi
 
@@ -144,11 +156,9 @@ function download(){
 		return
 	fi
 
-	echo -e "\e[01;32mDownloading stream to \"$LOCAL_FILE\"\e[00m"
-
 	t=$(timer)
 
-	playlist=$(curl ${STREAM})
+	playlist=$(curl $CURL_ ${STREAM})
 
 	for line in $playlist ; do
 		if [[ "$line" == *http* ]]; then
@@ -158,19 +168,109 @@ function download(){
 
     if [[ "$DOWNLOADER_BIN" == "curl" ]]; then
         # Download each part into one file
+        # Bad!!
         for line in $playlist ; do
             if [[ "$line" == *http* ]]; then
                 current=$((current+1))
                 echo -e "\e[01;32mDownloading part ${current} of ${total}\e[00m"
-                curl $line >> $LOCAL_FILE
+                curl $CURL_ $line >> $LOCAL_FILE
             fi
         done
         echo -e "\"$LOCAL_FILE\" downloaded..."
     else
-        echo "Downloading via $DOWNLOADER_BIN"
-        $DOWNLOADER_BIN -i $STREAM -c copy -bsf:a aac_adtstoasc $LOCAL_FILE
-        printf 'Elapsed time: %s\n' $(timer $t)
+        # Get the length
+        TMP="/tmp/${LOCAL_FILE}.output"
+        LENGTH_S=$(ffprobe -v quiet -show_format "$STREAM" | grep duration | cut -c 10-|awk '{print int($1)}')
+        LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
+        $DOWNLOADER_BIN -i $STREAM -c copy -loglevel 0 -stats -bsf:a aac_adtstoasc $LOCAL_FILE \
+            -y -loglevel 0 -stats 2>"$TMP"&
+        PID_=$!
+        while sleep 1;
+        do
+            line=$(cat "$TMP" | tr '\r' '\n' | tail -1)
+            curr_stamp=$(echo $line| awk -F "=" '{print $6}' | rev | cut -c 12- | rev)
+            curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
+            echo -n -e " - Status: $curr_stamp of $LENGTH_STAMP -"\
+                "$((($curr_s*100)/$LENGTH_S))%," \
+                "$(getfilesize $LOCAL_FILE)  \r"
+            kill -0 $PID_ 2>/dev/null || break;
+        done
+        echo -n -e " - Status: $LENGTH_STAMP of $LENGTH_STAMP - " \
+            "100%, " \
+            "$(getfilesize $LOCAL_FILE)"
+        echo -e "\n - Download complete"
+        rm "$TMP"
+        printf ' - Elapsed time: %s\n\n' $(timer $t)
     fi
+}
+# Get json value from V7
+function parseJSON(){
+    local JSON=$1
+    local TAG=$2
+    REG='"TAG":.*?[^\\]",'
+    echo $JSON | grep -Po ${REG/TAG/$TAG} | cut -c $((${#TAG}+5))- | rev | cut -c 3- | rev
+
+}
+
+# Get an attribute from a html tag
+function getHTMLAttr(){
+    local HTML=$1
+    local LINE_HINT=$2
+    local ATTR=$3
+    local FNC='
+        /HINT/ {
+        gsub( ".*ATTR=\"", "" );
+        gsub( "\".*", "" );
+        print;
+    }'
+    FNC=${FNC/HINT/$LINE_HINT}
+    FNC=${FNC/ATTR/$ATTR}
+    echo $HTML | awk "${FNC}"  RS="[<>]"
+
+}
+
+# Get the content of a meta tag
+function getHTMLMeta(){
+    local HTML=$1
+    local NAME=$2
+    getHTMLAttr "$HTML" "meta name=\"$NAME\"" "content"
+}
+
+# Get the content inside a HTML-Tag
+function getHTMLContent(){
+    local HTML=$1
+    local HINT=$2
+    FNC='/HINT/{gsub(".*>","");$1=$1;print}'
+    echo $HTML | awk ${FNC/HINT/$HINT} RS="<"
+}
+# Download all the episodes!
+function program_all(){
+    local URL=$1
+    local SEASON=$2
+    HTML=$(curl $CURL_ $URL)
+    Program_ID=$(getHTMLAttr "$HTML" "programid")
+    SEASONS=$(getHTMLAttr "$HTML" "data-season" "data-season")
+    if $SEASON ; then
+        SEASONS=$(echo $SEASONS | awk '{ print $1 }')
+    fi
+
+    SERIES_NAME=$(getHTMLMeta "$HTML" "seriesid")
+    for season in $SEASONS ; do
+        URL="http://tv.nrk.no/program/Episodes/$SERIES_NAME/$season/placeholder"
+        if [ $season = "extra" ]; then
+            URL="http://tv.nrk.no/extramaterial/$SERIES_NAME"
+        fi
+        S_HTML=$(curl $CURL_ $URL)
+        EPISODES=$(getHTMLAttr "$S_HTML" "data-episode" "data-episode")
+        SEASON_NAME=$(getHTMLContent "$S_HTML" "h1")
+        echo "Downloading $SEASON_NAME"
+
+        # loop through all the episodes
+        for episode in $EPISODES ; do
+            program "http://tv.nrk.no/serie/$SERIES_NAME/$episode"
+        done
+
+    done
 }
 
 # Download program from url $1, to a local file $2 (if provided)
@@ -178,55 +278,37 @@ function program(){
 	local URL=$1
 	local LOCAL_FILE=$2
 
-	echo -e "\e[01;32mFetching stream url\e[00m"
-
-	HTML=$(curl $URL)
+    # TODO Check if it is downloadable, and why...
+	HTML=$(curl $CURL_ -L $URL)
 
 	# See if program has more than one part
-	STREAMS=$(echo $HTML | awk '
-		/data-method="playStream"/ {
-		    gsub( ".*data-argument=\"", "" );
-       		gsub( "\".*", "" );
-		    print;
-	}
-	' RS="[<>]")
+    STREAMS=$(getHTMLAttr "$HTML" "data-method=\"playStream\"" "data-argument")
 
-	if [[ -z $STREAMS ]]; then
+    Program_ID=$(getHTMLMeta "$HTML" "programid")
+
+    V7=$(curl $CURL_ "http://v7.psapi.nrk.no/mediaelement/${Program_ID}")
+    TITLE=$(parseJSON "$V7" "fullTitle")
+
+    echo "Downloading \"$TITLE\" "
+
+    if [[ -z $STREAMS ]]; then
 		# Only one part
-
-		STREAMS=$(echo $HTML | awk '
-    		/div id="playerelement"/ {
-			gsub( ".*data-media=\"", "" );
-  		     	gsub( "\".*", "" );
-     	  		print;
-    		}
-		' RS="[<>]")
-
+        STREAMS=$(getHTMLAttr "$HTML" "div id=\"playerelement\"" "data-media")
 		# If stream is unable to be found,
 		# make the user use "stream"
-		if [ -z $STREAMS ]; then
-			echo -e "Unable to find stream..."
-			echo -e "If url is valid; check for updates at <https://github.com/odinuge/NRK-TV-Downloader>,"
-			echo -e "or use:\e[01;32m $0 [HLS_STREAM] [LOCAL_FILE]\e[00m instead."
-			exit 1
-		fi
+        if [[ ! $STREAMS == *"akamaihd.net"* ]]; then
+			echo -e " - Unable to download this program...\n"
+			return
+        fi
 		PARTS=false
 	else
 		# Several parts
 		PARTS=true
 	fi
-	# Download the stream(s)
+    # Download the stream(s)
 	for STREAM in $STREAMS ; do
 		if [ -z $LOCAL_FILE ]; then
-			Program_ID=$(echo $HTML | awk '
-    			/meta name="programid"/ {
-				gsub( ".*content=\"", "" );
-  	     			gsub( "\".*", "" );
-       				print;
-				}' RS="[<>]")
-
-            FILE=$(curl "http://v7.psapi.nrk.no/mediaelement/${Program_ID}" | \
-            grep -Po '"fullTitle":.*?[^\\]",' | cut -c 14- | rev | cut -c 3- | rev)
+            FILE=$TITLE
 		else
 			FILE=$LOCAL_FILE
 		fi
@@ -246,22 +328,60 @@ function program(){
 		if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
 			FILE="${FILE}.mp4"
 		fi
-		download $STREAM $FILE
+        download $STREAM $FILE
 	done
 
 }
-
+DL_ALL=false
+SEASON=false
 # Main part of script
-case $1 in
+OPTIND=1
+
+while getopts "hasv" opt; do
+    case "$opt" in
+    h)
+        usage
+        exit 0
+        ;;
+    v)
+        echo -e "NRK-TV-Downloader v$VERSION"
+        exit 0
+    ;;
+    a)  DL_ALL=true
+        ;;
+    f)  DL_ALL=true
+        SEASON=true
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+[ "$1" = "--" ] && shift
+if [ -z $1 ]
+then
+    usage
+    exit 1
+fi
+
+for var in "$@"
+do
+    case $var in
+
 	*akamaihd.net*)
-		download $1 $2
+		download $var
 	;;
 	*tv.nrk.no*)
-		program $1 $2
+        if $DL_ALL ; then
+            program_all $var $SEASON
+        else
+            program $var
+        fi
 	;;
-	*)
+    *)
 		usage
 	;;
-esac
+    esac
+done
 
 # The End!
