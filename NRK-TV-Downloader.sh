@@ -34,8 +34,8 @@ DRY_RUN=false
 
 # Check the shell
 if [ -z "$BASH_VERSION" ]; then
-	echo -e "This script needs bash"
-	exit 1
+    echo -e "This script needs bash"
+    exit 1
 fi
 
 # Curl flags (for making it silent)
@@ -69,102 +69,105 @@ fi
 # Function to measure time
 function timer()
 {
-	if [[ $# -eq 0 ]]; then
-		echo $(date '+%s')
-	else
-		local  stime=$1
-		etime=$(date '+%s')
+    if [[ $# -eq 0 ]]; then
+        echo $(date '+%s')
+    else
+        local  stime=$1
+        etime=$(date '+%s')
 
-		if [[ -z "$stime" ]]; then
-			stime=$etime;
-		fi
+        if [[ -z "$stime" ]]; then
+            stime=$etime;
+        fi
 
-	        dt=$((etime - stime))
-	        ds=$((dt % 60))
-	        dm=$(((dt / 60) % 60))
-	        dh=$((dt / 3600))
-	        printf '%d:%02d:%02d' $dh $dm $ds
-	fi
+        dt=$((etime - stime))
+        ds=$((dt % 60))
+        dm=$(((dt / 60) % 60))
+        dh=$((dt / 3600))
+        printf '%d:%02d:%02d' $dh $dm $ds
+    fi
 }
 
 # Print USAGE
-function usage() {
-	echo -e "NRK-TV-Downloader v$VERSION"
+function usage()
+{
+    echo -e "NRK-TV-Downloader v$VERSION"
     echo -e "\nUsage: \e[01;32m$0 <OPTION>... [PROGRAM_URL(s)]...\e[00m"
-	echo -e "\nOptions:"
-	echo -e "\t -a download all episodes, in all seasons."
-	echo -e "\t -s download all episodes in season"
+    echo -e "\nOptions:"
+    echo -e "\t -a download all episodes, in all seasons."
+    echo -e "\t -s download all episodes in season"
     echo -e "\t -v print version"
-	echo -e "\t -h print this\n"
-	echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
+    echo -e "\t -h print this\n"
+    echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
 }
 
 # Get the filesize of a file
-function getfilesize(){
+function getfilesize()
+{
     local FILE=$1
     du -h $FILE | awk '{print $1}'
 }
 
 # Download a stream $1, to a local file $2
-function download(){
+function download()
+{
 
-	local STREAM=$1
-	local LOCAL_FILE=$2
+    local STREAM=$1
+    local LOCAL_FILE=$2
 
 
-	if [ -z $STREAM ] ; then
-		echo -e  "No stream provided"
-		exit 1
-	fi
+    if [ -z $STREAM ] ; then
+        echo -e  "No stream provided"
+        exit 1
+    fi
 
-	if [ -z $LOCAL_FILE ] ; then
-		echo -e  "No local file provided"
-		exit 1
-	fi
+    if [ -z $LOCAL_FILE ] ; then
+        echo -e  "No local file provided"
+        exit 1
+    fi
 
-	if [ -f $LOCAL_FILE ]; then
-		echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
+    if [ -f $LOCAL_FILE ]; then
+        echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
         read -n 1 ans
         echo
         if [ -z $ans ]; then
             return
-		elif [ $ans = 'y' ]; then
-			rm $LOCAL_FILE
-		elif [ $ans = 'Y' ]; then
-			rm $LOCAL_FILE
-		else
-			return
-		fi
-	fi
+        elif [ $ans = 'y' ]; then
+            rm $LOCAL_FILE
+        elif [ $ans = 'Y' ]; then
+            rm $LOCAL_FILE
+        else
+            return
+        fi
+    fi
 
-	# Make sure it is HLS, not flash
-	# if it is flash, change url to HLS
-	if [[ $STREAM == *manifest.f4m ]]; then
-		#Replacing char(s)
-		STREAM=$(echo $STREAM | sed -e 's/z/i/g')
-		STREAM=$(echo $STREAM | sed -e 's/manifest.f4m/master.m3u8/g')
-	fi
+    # Make sure it is HLS, not flash
+    # if it is flash, change url to HLS
+    if [[ $STREAM == *manifest.f4m ]]; then
+        #Replacing char(s)
+        STREAM=$(echo $STREAM | sed -e 's/z/i/g')
+        STREAM=$(echo $STREAM | sed -e 's/manifest.f4m/master.m3u8/g')
+    fi
 
-	# See if the stream is the master playlist
-	if [[ "$STREAM" == *master.m3u8 ]]; then
-		STREAM=$(echo $STREAM | sed -e "s/master.m3u8/index_4_av.m3u8/g")
+    # See if the stream is the master playlist
+    if [[ "$STREAM" == *master.m3u8 ]]; then
+        STREAM=$(echo $STREAM | sed -e "s/master.m3u8/index_4_av.m3u8/g")
 
-	fi
+    fi
 
-	if $DRY_RUN ; then
-		echo "DOWNLOADING: $LOCAL_FILE, FROM: $STREAM, with $DOWNLOADER_BIN"
-		return
-	fi
+    if $DRY_RUN ; then
+        echo "DOWNLOADING: $LOCAL_FILE, FROM: $STREAM, with $DOWNLOADER_BIN"
+        return
+    fi
 
-	t=$(timer)
+    t=$(timer)
 
-	playlist=$(curl $CURL_ ${STREAM})
+    playlist=$(curl $CURL_ ${STREAM})
 
-	for line in $playlist ; do
-		if [[ "$line" == *http* ]]; then
-			total=$((total+1))
-		fi
-	done
+    for line in $playlist ; do
+        if [[ "$line" == *http* ]]; then
+            total=$((total+1))
+        fi
+    done
 
     if [[ "$DOWNLOADER_BIN" == "curl" ]]; then
         # Download each part into one file
@@ -204,7 +207,8 @@ function download(){
     fi
 }
 # Get json value from V7
-function parseJSON(){
+function parseJSON()
+{
     local JSON=$1
     local TAG=$2
     REG='"TAG":.*?[^\\]",'
@@ -213,38 +217,42 @@ function parseJSON(){
 }
 
 # Get an attribute from a html tag
-function getHTMLAttr(){
+function getHTMLAttr()
+{
     local HTML=$1
     local LINE_HINT=$2
     local ATTR=$3
     local FNC='
-        /HINT/ {
-        gsub( ".*ATTR=\"", "" );
-        gsub( "\".*", "" );
-        print;
-    }'
-    FNC=${FNC/HINT/$LINE_HINT}
-    FNC=${FNC/ATTR/$ATTR}
-    echo $HTML | awk "${FNC}"  RS="[<>]"
+    /HINT/ {
+    gsub( ".*ATTR=\"", "" );
+    gsub( "\".*", "" );
+    print;
+}'
+FNC=${FNC/HINT/$LINE_HINT}
+FNC=${FNC/ATTR/$ATTR}
+echo $HTML | awk "${FNC}"  RS="[<>]"
 
 }
 
 # Get the content of a meta tag
-function getHTMLMeta(){
+function getHTMLMeta()
+{
     local HTML=$1
     local NAME=$2
     getHTMLAttr "$HTML" "meta name=\"$NAME\"" "content"
 }
 
 # Get the content inside a HTML-Tag
-function getHTMLContent(){
+function getHTMLContent()
+{
     local HTML=$1
     local HINT=$2
     FNC='/HINT/{gsub(".*>","");$1=$1;print}'
     echo $HTML | awk ${FNC/HINT/$HINT} RS="<"
 }
 # Download all the episodes!
-function program_all(){
+function program_all()
+{
     local URL=$1
     local SEASON=$2
     HTML=$(curl $CURL_ $URL)
@@ -274,14 +282,15 @@ function program_all(){
 }
 
 # Download program from url $1, to a local file $2 (if provided)
-function program(){
-	local URL=$1
-	local LOCAL_FILE=$2
+function program()
+{
+    local URL=$1
+    local LOCAL_FILE=$2
 
     # TODO Check if it is downloadable, and why...
-	HTML=$(curl $CURL_ -L $URL)
+    HTML=$(curl $CURL_ -L $URL)
 
-	# See if program has more than one part
+    # See if program has more than one part
     STREAMS=$(getHTMLAttr "$HTML" "data-method=\"playStream\"" "data-argument")
 
     Program_ID=$(getHTMLMeta "$HTML" "programid")
@@ -292,44 +301,44 @@ function program(){
     echo "Downloading \"$TITLE\" "
 
     if [[ -z $STREAMS ]]; then
-		# Only one part
+        # Only one part
         STREAMS=$(getHTMLAttr "$HTML" "div id=\"playerelement\"" "data-media")
-		# If stream is unable to be found,
-		# make the user use "stream"
+        # If stream is unable to be found,
+        # make the user use "stream"
         if [[ ! $STREAMS == *"akamaihd.net"* ]]; then
-			echo -e " - Unable to download this program...\n"
-			return
+            echo -e " - Unable to download this program...\n"
+            return
         fi
-		PARTS=false
-	else
-		# Several parts
-		PARTS=true
-	fi
+        PARTS=false
+    else
+        # Several parts
+        PARTS=true
+    fi
     # Download the stream(s)
-	for STREAM in $STREAMS ; do
-		if [ -z $LOCAL_FILE ]; then
+    for STREAM in $STREAMS ; do
+        if [ -z $LOCAL_FILE ]; then
             FILE=$TITLE
-		else
-			FILE=$LOCAL_FILE
-		fi
+        else
+            FILE=$LOCAL_FILE
+        fi
 
-		if $PARTS ; then
-			part=$((part+1))
-			MORE="-Part_$part"
-			FILE="${FILE// /_}$MORE"
-		else
-			FILE="${FILE// /_}"
-		fi
+        if $PARTS ; then
+            part=$((part+1))
+            MORE="-Part_$part"
+            FILE="${FILE// /_}$MORE"
+        else
+            FILE="${FILE// /_}"
+        fi
 
-		FILE="${FILE//&#230;/æ}"
-		FILE="${FILE//&#216;/ø}"
-		FILE="${FILE//&#229;/å}"
-		FILE="${FILE//:/-}"
-		if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
-			FILE="${FILE}.mp4"
-		fi
+        FILE="${FILE//&#230;/æ}"
+        FILE="${FILE//&#216;/ø}"
+        FILE="${FILE//&#229;/å}"
+        FILE="${FILE//:/-}"
+        if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
+            FILE="${FILE}.mp4"
+        fi
         download $STREAM $FILE
-	done
+    done
 
 }
 DL_ALL=false
@@ -339,19 +348,19 @@ OPTIND=1
 
 while getopts "hasv" opt; do
     case "$opt" in
-    h)
-        usage
-        exit 0
-        ;;
-    v)
-        echo -e "NRK-TV-Downloader v$VERSION"
-        exit 0
-    ;;
-    a)  DL_ALL=true
-        ;;
-    f)  DL_ALL=true
-        SEASON=true
-        ;;
+        h)
+            usage
+            exit 0
+            ;;
+        v)
+            echo -e "NRK-TV-Downloader v$VERSION"
+            exit 0
+            ;;
+        a)  DL_ALL=true
+            ;;
+        f)  DL_ALL=true
+            SEASON=true
+            ;;
     esac
 done
 
@@ -368,19 +377,19 @@ for var in "$@"
 do
     case $var in
 
-	*akamaihd.net*)
-		download $var
-	;;
-	*tv.nrk.no*)
-        if $DL_ALL ; then
-            program_all $var $SEASON
-        else
-            program $var
-        fi
-	;;
-    *)
-		usage
-	;;
+        *akamaihd.net*)
+            download $var
+            ;;
+        *tv.nrk.no*)
+            if $DL_ALL ; then
+                program_all $var $SEASON
+            else
+                program $var
+            fi
+            ;;
+        *)
+            usage
+            ;;
     esac
 done
 
