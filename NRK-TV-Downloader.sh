@@ -226,12 +226,10 @@ function getHTMLAttr()
     /HINT/ {
     gsub( ".*ATTR=\"", "" );
     gsub( "\".*", "" );
-    print;
-}'
-FNC=${FNC/HINT/$LINE_HINT}
-FNC=${FNC/ATTR/$ATTR}
-echo $HTML | awk "${FNC}"  RS="[<>]"
-
+    print; }'
+    FNC=${FNC/HINT/$LINE_HINT}
+    FNC=${FNC/ATTR/$ATTR}
+    echo $HTML | awk "${FNC}"  RS="[<>]"
 }
 
 # Get the content of a meta tag
@@ -250,6 +248,7 @@ function getHTMLContent()
     FNC='/HINT/{gsub(".*>","");$1=$1;print}'
     echo $HTML | awk ${FNC/HINT/$HINT} RS="<"
 }
+
 # Download all the episodes!
 function program_all()
 {
@@ -271,7 +270,7 @@ function program_all()
         S_HTML=$(curl $CURL_ $URL)
         EPISODES=$(getHTMLAttr "$S_HTML" "data-episode" "data-episode")
         SEASON_NAME=$(getHTMLContent "$S_HTML" "h1")
-        echo "Downloading $SEASON_NAME"
+        echo -n "Downloading $SEASON_NAME"
 
         # loop through all the episodes
         for episode in $EPISODES ; do
@@ -290,6 +289,7 @@ function program()
     # TODO Check if it is downloadable, and why...
     HTML=$(curl $CURL_ -L $URL)
 
+    # TODO Find season name, and add it to name
     # See if program has more than one part
     STREAMS=$(getHTMLAttr "$HTML" "data-method=\"playStream\"" "data-argument")
 
@@ -298,6 +298,9 @@ function program()
     V7=$(curl $CURL_ "http://v7.psapi.nrk.no/mediaelement/${Program_ID}")
     TITLE=$(parseJSON "$V7" "fullTitle")
 
+    SEASON=$(echo "$(getHTMLAttr "$HTML" "og:video" "content" | awk '/sesong/{printf(" %s", $0)}' RS='/')")
+
+    TITLE="$TITLE$SEASON"
     echo "Downloading \"$TITLE\" "
 
     if [[ -z $STREAMS ]]; then
@@ -358,7 +361,7 @@ while getopts "hasv" opt; do
             ;;
         a)  DL_ALL=true
             ;;
-        f)  DL_ALL=true
+        s)  DL_ALL=true
             SEASON=true
             ;;
     esac
