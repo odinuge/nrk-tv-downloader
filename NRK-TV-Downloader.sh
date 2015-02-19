@@ -311,7 +311,19 @@ function program()
         # If stream is unable to be found,
         # make the user use "stream"
         if [[ ! $STREAMS == *"akamaihd.net"* ]]; then
-            echo -e " - Unable to download this program...\n"
+            message=$(echo $(parseJSON "$V7" "messageType") | awk 'BEGIN { FS=";" }
+            {
+                rest = $1
+                while ( match( rest, /[a-z][A-Z]/ ) )
+                {
+                    printf("%s " ,substr( rest, 1, RSTART) );
+                    rest = substr( rest, RSTART+1 );
+                }
+                if (rest){
+                    printf("%s\n", rest);
+                }
+            }')
+            echo -e " - Unable to download: $message\n"
             return
         fi
         PARTS=false
