@@ -95,6 +95,7 @@ function usage()
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
     echo -e "\t -s download all episodes in season"
+    echo -e "\t -d dry run - see what is possible to download, and not "
     echo -e "\t -v print version"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
@@ -154,11 +155,6 @@ function download()
 
     fi
 
-    if $DRY_RUN ; then
-        echo "DOWNLOADING: $LOCAL_FILE, FROM: $STREAM, with $DOWNLOADER_BIN"
-        return
-    fi
-
     t=$(timer)
 
     playlist=$(curl $CURL_ ${STREAM})
@@ -185,6 +181,12 @@ function download()
         TMP="/tmp/${LOCAL_FILE}.output"
         LENGTH_S=$(ffprobe -v quiet -show_format "$STREAM" | grep duration | cut -c 10-|awk '{print int($1)}')
         LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
+        if $DRY_RUN ; then
+            echo -e " - Length: $LENGTH_STAMP"
+            echo -e " - Program is downloadable.\n"
+            return
+        fi
+
         $DOWNLOADER_BIN -i $STREAM -c copy -loglevel 0 -stats -bsf:a aac_adtstoasc $LOCAL_FILE \
             -y -loglevel 0 -stats 2>"$TMP"&
         PID_=$!
@@ -349,7 +351,7 @@ SEASON=false
 # Main part of script
 OPTIND=1
 
-while getopts "hasv" opt; do
+while getopts "hasdv" opt; do
     case "$opt" in
         h)
             usage
@@ -358,6 +360,8 @@ while getopts "hasv" opt; do
         v)
             echo -e "NRK-TV-Downloader v$VERSION"
             exit 0
+            ;;
+        d)  DRY_RUN=true
             ;;
         a)  DL_ALL=true
             ;;
