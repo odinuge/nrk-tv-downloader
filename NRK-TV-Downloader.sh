@@ -28,6 +28,8 @@
 # Henrik Lilleengen <mail@ithenrik.com>
 #
 
+shopt -s expand_aliases
+
 VERSION="0.9.0"
 DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
@@ -43,12 +45,26 @@ CURL_="-s"
 
 # Checking dependencies
 for dep in $DEPS; do
-    hash $dep > /dev/null
+    hash $dep 2> /dev/null
     if [ $? -ne 0 ]; then
         echo -e "Error: Required program could not be found: $dep"
         exit 1
     fi
 done
+
+SUB_DOWNLOADER=false
+
+# Check for sub-downloader
+hash "tt-to-subrip" 2> /dev/null
+if [ $? -ne 0 ]; then
+    DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+    if [ -f "$DIR/tt-to-subrip/tt-to-subrip.awk" ]; then
+        alias "tt-to-subrip"="$DIR/tt-to-subrip/tt-to-subrip.awk"
+        SUB_DOWNLOADER=true
+    fi
+else
+    SUB_DOWNLOADER=true
+fi
 
 DOWNLOADER_BIN="curl"
 DOWNLOADERS="ffmpeg avconv"
@@ -300,10 +316,25 @@ function program()
     V7=$(curl $CURL_ "http://v7.psapi.nrk.no/mediaelement/${Program_ID}")
     TITLE=$(parseJSON "$V7" "fullTitle")
 
-    SEASON=$(echo "$(getHTMLAttr "$HTML" "og:video" "content" | awk '/sesong/{printf(" %s", $0)}' RS='/')")
+    SEASON=$(parseJSON "$V7" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
 
     TITLE="$TITLE$SEASON"
     echo "Downloading \"$TITLE\" "
+
+    FILE=$(fix_filename "$TITLE")
+
+    HAS_SUB=$(echo $HTML | awk '/programHasSubtitles/{sub(".*nrk.programHasSubtitles = \"","");sub("\".*","");print}')
+
+    if [ $HAS_SUB == "True" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
+        echo " - Downloading subtitle"
+        curl $CURL_ "http://tv.nrk.no/programsubtitles/$Program_ID" | tt-to-subrip > "$FILE.srt"
+    elif $SUB_DOWNLOADER ; then
+        if [ $HAS_SUB == "True" ] ; then
+            echo " - Subtitle is available"
+        else
+            echo " - Subtitle is not available"
+        fi
+    fi
 
     if [[ -z $STREAMS ]]; then
         # Only one part

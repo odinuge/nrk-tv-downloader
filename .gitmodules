@@ -1,0 +1,3 @@
+[submodule "tt-to-subrip"]
+	path = tt-to-subrip
+	url = https://github.com/odinuge/tt-to-subrip
