@@ -121,7 +121,7 @@ function usage()
 function getfilesize()
 {
     local FILE=$1
-    du -h $FILE | awk '{print $1}'
+    du -h $FILE 2>/dev/null | awk '{print $1}'
 }
 
 # Download a stream $1, to a local file $2
@@ -199,7 +199,7 @@ function download()
         LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
         if $DRY_RUN ; then
             echo -e " - Length: $LENGTH_STAMP"
-            echo -e " - Program is downloadable.\n"
+            echo -e " - Program is \e[01;32mavailable.\e[00m\n"
             return
         fi
 
@@ -229,8 +229,11 @@ function parseJSON()
 {
     local JSON=$1
     local TAG=$2
-    REG='"TAG":.*?[^\\]",'
-    echo $JSON | grep -Po ${REG/TAG/$TAG} | cut -c $((${#TAG}+5))- | rev | cut -c 3- | rev
+    #REG='"TAG":.*?[^\\]",'
+    #echo $JSON | grep -Po ${REG/TAG/$TAG} | cut -c $((${#TAG}+5))- | rev | cut -c 3- | rev
+    local FNC='{gsub(".*TAG\"",""); print $2}'
+    FNC="${FNC/TAG/$TAG}"
+    echo $JSON | awk -F '"' "$FNC"
 
 }
 
@@ -276,14 +279,13 @@ function program_all()
     Program_ID=$(getHTMLAttr "$HTML" "programid")
     SEASONS=$(getHTMLAttr "$HTML" "data-season" "data-season")
     if $SEASON ; then
-        SEASONS=$(echo $SEASONS | awk '{ print $1 }')
+        SEASONS=$(getHTMLAttr "$HTML" "seasonid")
     fi
-
     SERIES_NAME=$(getHTMLMeta "$HTML" "seriesid")
     for season in $SEASONS ; do
-        URL="http://tv.nrk.no/program/Episodes/$SERIES_NAME/$season/placeholder"
+        URL="https://tv.nrk.no/program/Episodes/$SERIES_NAME/$season"
         if [ $season = "extra" ]; then
-            URL="http://tv.nrk.no/extramaterial/$SERIES_NAME"
+            URL="https://tv.nrk.no/extramaterial/$SERIES_NAME"
         fi
         S_HTML=$(curl $CURL_ $URL)
         EPISODES=$(getHTMLAttr "$S_HTML" "data-episode" "data-episode")
@@ -292,7 +294,7 @@ function program_all()
 
         # loop through all the episodes
         for episode in $EPISODES ; do
-            program "http://tv.nrk.no/serie/$SERIES_NAME/$episode"
+            program "https://tv.nrk.no/serie/$SERIES_NAME/$episode"
         done
 
     done
@@ -321,13 +323,18 @@ function program()
     TITLE="$TITLE$SEASON"
     echo "Downloading \"$TITLE\" "
 
-    FILE=$(fix_filename "$TITLE")
-
+    FILE="$TITLE"
+    FILE="${FILE// /_}"
+    FILE="${FILE//&#230;/ae}"
+    FILE="${FILE//ø/o}"
+    FILE="${FILE//å/aa}"
+    FILE="${FILE//:/-}"
     HAS_SUB=$(echo $HTML | awk '/programHasSubtitles/{sub(".*nrk.programHasSubtitles = \"","");sub("\".*","");print}')
 
     if [ $HAS_SUB == "True" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
-        curl $CURL_ "http://tv.nrk.no/programsubtitles/$Program_ID" | tt-to-subrip > "$FILE.srt"
+
+        curl $CURL_ "https://tv.nrk.no/programsubtitles/$Program_ID" | tt-to-subrip > "$FILE.srt"
     elif $SUB_DOWNLOADER ; then
         if [ $HAS_SUB == "True" ] ; then
             echo " - Subtitle is available"
@@ -354,7 +361,7 @@ function program()
                     printf("%s\n", rest);
                 }
             }')
-            echo -e " - Unable to download: $message\n"
+            echo -e " - Program is \e[31mnot available\e[0m: $message\n"
             return
         fi
         PARTS=false
@@ -365,7 +372,7 @@ function program()
     # Download the stream(s)
     for STREAM in $STREAMS ; do
         if [ -z $LOCAL_FILE ]; then
-            FILE=$TITLE
+            FILE=$FILE
         else
             FILE=$LOCAL_FILE
         fi
@@ -374,14 +381,9 @@ function program()
             part=$((part+1))
             MORE="-Part_$part"
             FILE="${FILE// /_}$MORE"
-        else
-            FILE="${FILE// /_}"
         fi
 
-        FILE="${FILE//&#230;/æ}"
-        FILE="${FILE//&#216;/ø}"
-        FILE="${FILE//&#229;/å}"
-        FILE="${FILE//:/-}"
+
         if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
             FILE="${FILE}.mp4"
         fi
