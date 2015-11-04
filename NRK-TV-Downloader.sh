@@ -334,7 +334,7 @@ function program()
     if [ $HAS_SUB == "True" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
 
-        curl $CURL_ "https://tv.nrk.no/programsubtitles/$Program_ID" | tt-to-subrip > "$FILE.srt"
+        curl $CURL_ "http://v8.psapi.nrk.no/programs/$Program_ID/subtitles/tt" | tt-to-subrip > "$FILE.srt"
     elif $SUB_DOWNLOADER ; then
         if [ $HAS_SUB == "True" ] ; then
             echo " - Subtitle is available"
@@ -382,7 +382,6 @@ function program()
             MORE="-Part_$part"
             FILE="${FILE// /_}$MORE"
         fi
-
 
         if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
             FILE="${FILE}.mp4"
