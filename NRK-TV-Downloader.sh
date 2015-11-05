@@ -30,7 +30,7 @@
 
 shopt -s expand_aliases
 
-VERSION="0.9.0"
+VERSION="0.9.9"
 DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
 
@@ -68,7 +68,6 @@ fi
 
 DOWNLOADER_BIN="curl"
 DOWNLOADERS="ffmpeg avconv"
-
 
 # Check for ffmpeg or avconv
 for downloader in $DOWNLOADERS; do
@@ -111,7 +110,7 @@ function usage()
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
     echo -e "\t -s download all episodes in season"
-    echo -e "\t -d dry run - see what is possible to download, and not "
+    echo -e "\t -d dry run - list what is possible to download"
     echo -e "\t -v print version"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
@@ -142,7 +141,7 @@ function download()
         exit 1
     fi
 
-    if [ -f $LOCAL_FILE ]; then
+    if [ -f $LOCAL_FILE ] && ! $DRY_RUN; then
         echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
         read -n 1 ans
         echo
@@ -171,6 +170,7 @@ function download()
 
     fi
 
+    # Start timer
     t=$(timer)
 
     playlist=$(curl $CURL_ ${STREAM})
@@ -224,17 +224,23 @@ function download()
         printf ' - Elapsed time: %s\n\n' $(timer $t)
     fi
 }
-# Get json value from V7
+
+# Get json value from V8
 function parseJSON()
 {
     local JSON=$1
     local TAG=$2
-    #REG='"TAG":.*?[^\\]",'
-    #echo $JSON | grep -Po ${REG/TAG/$TAG} | cut -c $((${#TAG}+5))- | rev | cut -c 3- | rev
-    local FNC='{gsub(".*TAG\"",""); print $2}'
+    local FNC='
+    BEGIN{
+        RS="{\"|,\"";
+        FS="\":";
+    }
+    /TAG/{
+        gsub("\"","",$2);
+        print $2;
+    }'
     FNC="${FNC/TAG/$TAG}"
-    echo $JSON | awk -F '"' "$FNC"
-
+    echo $JSON | awk "$FNC"
 }
 
 # Get an attribute from a html tag
@@ -245,12 +251,13 @@ function getHTMLAttr()
     local ATTR=$3
     local FNC='
     /HINT/ {
-    gsub( ".*ATTR=\"", "" );
-    gsub( "\".*", "" );
-    print; }'
+        gsub( ".*ATTR=\"", "" );
+        gsub( "\".*", "" );
+        print;
+    }'
     FNC=${FNC/HINT/$LINE_HINT}
     FNC=${FNC/ATTR/$ATTR}
-    echo $HTML | awk "${FNC}"  RS="[<>]"
+    echo $HTML | awk "${FNC}" RS="[<>]"
 }
 
 # Get the content of a meta tag
@@ -266,7 +273,11 @@ function getHTMLContent()
 {
     local HTML=$1
     local HINT=$2
-    FNC='/HINT/{gsub(".*>","");$1=$1;print}'
+    FNC='/HINT/{
+        gsub(".*>","");
+        $1=$1;
+        print
+    }'
     echo $HTML | awk ${FNC/HINT/$HINT} RS="<"
 }
 
@@ -277,11 +288,14 @@ function program_all()
     local SEASON=$2
     HTML=$(curl $CURL_ $URL)
     Program_ID=$(getHTMLAttr "$HTML" "programid")
+
     SEASONS=$(getHTMLAttr "$HTML" "data-season" "data-season")
     if $SEASON ; then
         SEASONS=$(getHTMLAttr "$HTML" "seasonid")
     fi
     SERIES_NAME=$(getHTMLMeta "$HTML" "seriesid")
+
+    # Loop through all seasons, or just the selected one
     for season in $SEASONS ; do
         URL="https://tv.nrk.no/program/Episodes/$SERIES_NAME/$season"
         if [ $season = "extra" ]; then
@@ -304,37 +318,39 @@ function program_all()
 function program()
 {
     local URL=$1
-    local LOCAL_FILE=$2
 
-    # TODO Check if it is downloadable, and why...
     HTML=$(curl $CURL_ -L $URL)
 
-    # TODO Find season name, and add it to name
     # See if program has more than one part
     STREAMS=$(getHTMLAttr "$HTML" "data-method=\"playStream\"" "data-argument")
 
     Program_ID=$(getHTMLMeta "$HTML" "programid")
 
-    V7=$(curl $CURL_ "http://v7.psapi.nrk.no/mediaelement/${Program_ID}")
-    TITLE=$(parseJSON "$V7" "fullTitle")
+    # Fetch the info with the V8-API
+    V8=$(curl $CURL_ "http://v8.psapi.nrk.no/mediaelement/${Program_ID}")
+    TITLE=$(parseJSON "$V8" "fullTitle")
 
-    SEASON=$(parseJSON "$V7" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
+    SEASON=$(parseJSON "$V8" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
 
     TITLE="$TITLE$SEASON"
     echo "Downloading \"$TITLE\" "
 
+    # TODO FIXME Fix the name of the file
     FILE="$TITLE"
     FILE="${FILE// /_}"
     FILE="${FILE//&#230;/ae}"
     FILE="${FILE//ø/o}"
     FILE="${FILE//å/aa}"
     FILE="${FILE//:/-}"
-    HAS_SUB=$(echo $HTML | awk '/programHasSubtitles/{sub(".*nrk.programHasSubtitles = \"","");sub("\".*","");print}')
 
-    if [ $HAS_SUB == "True" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
+    # Check if program has a valid subtitle
+    HAS_SUB=$(parseJSON "$V8" "hasSubtitles")
+
+    if [ $HAS_SUB == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
 
-        curl $CURL_ "http://v8.psapi.nrk.no/programs/$Program_ID/subtitles/tt" | tt-to-subrip > "$FILE.srt"
+        curl $CURL_ "http://v8.psapi.nrk.no/programs/$Program_ID/subtitles/tt" | \
+            tt-to-subrip > "$FILE.srt"
     elif $SUB_DOWNLOADER ; then
         if [ $HAS_SUB == "True" ] ; then
             echo " - Subtitle is available"
@@ -349,19 +365,9 @@ function program()
         # If stream is unable to be found,
         # make the user use "stream"
         if [[ ! $STREAMS == *"akamaihd.net"* ]]; then
-            message=$(echo $(parseJSON "$V7" "messageType") | awk 'BEGIN { FS=";" }
-            {
-                rest = $1
-                while ( match( rest, /[a-z][A-Z]/ ) )
-                {
-                    printf("%s " ,substr( rest, 1, RSTART) );
-                    rest = substr( rest, RSTART+1 );
-                }
-                if (rest){
-                    printf("%s\n", rest);
-                }
-            }')
-            echo -e " - Program is \e[31mnot available\e[0m: $message\n"
+            message=$(parseJSON "$V8" "messageType" | \
+                awk '{gsub("[A-Z]"," &");print tolower($0)}')
+            echo -e " - Program is \e[31mnot available\e[0m:$message\n"
             return
         fi
         PARTS=false
@@ -371,11 +377,6 @@ function program()
     fi
     # Download the stream(s)
     for STREAM in $STREAMS ; do
-        if [ -z $LOCAL_FILE ]; then
-            FILE=$FILE
-        else
-            FILE=$LOCAL_FILE
-        fi
 
         if $PARTS ; then
             part=$((part+1))
@@ -383,9 +384,12 @@ function program()
             FILE="${FILE// /_}$MORE"
         fi
 
+
         if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
             FILE="${FILE}.mp4"
         fi
+
+        # Download the stream
         download $STREAM $FILE
     done
 
@@ -433,7 +437,7 @@ do
             ;;
         *tv.nrk.no*)
             if $DL_ALL ; then
-                program_all $var $SEASON
+                program_all $var
             else
                 program $var
             fi

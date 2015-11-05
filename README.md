@@ -9,7 +9,7 @@ Because the script relies on "HTML-Parsing" it can break at any time.
 
 This script may be useful for those who are struggeling with low bandwidth and/or bad playback performance.
 
-Current version: 0.5.0
+Current version: 0.9.9
 
 Usage
 ======================
@@ -20,15 +20,15 @@ Usage
     Options:
          -a download all episodes, in all seasons.
          -s download all episodes in season
+         -d dry run - list what is possible to download
          -v print version
          -h print this
 
 
-    For updates see <https://github.com/odinuge/NRK-TV-Downloader>  
+    For updates see <https://github.com/odinuge/NRK-TV-Downloader>
 
-    Example: 
+    Example:
     $ ./NRK-TV-Downloader.sh -a http://tv.nrk.no/serie/tore-paa-sporet/dmpf71005710/17-02-2013
-	
 
 Requirements
 ======================
