@@ -30,7 +30,7 @@
 
 shopt -s expand_aliases
 
-VERSION="0.9.9"
+VERSION="0.9.91"
 DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
 
@@ -110,6 +110,7 @@ function usage()
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
     echo -e "\t -s download all episodes in season"
+    echo -e "\t -n skip files that exists"
     echo -e "\t -d dry run - list what is possible to download"
     echo -e "\t -v print version"
     echo -e "\t -h print this\n"
@@ -143,6 +144,10 @@ function download()
 
     if [ -f $LOCAL_FILE ] && ! $DRY_RUN; then
         echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
+        if $NO_CONFIRM; then
+            echo -e "\n - Skipping program, \e[32malready downloaded\e[00m\n"
+            return
+        fi
         read -n 1 ans
         echo
         if [ -z $ans ]; then
@@ -278,7 +283,7 @@ function getHTMLContent()
         $1=$1;
         print
     }'
-    echo $HTML | awk ${FNC/HINT/$HINT} RS="<"
+    echo $HTML | awk ${FNC/HINT/$HINT} RS="<" 2>/dev/null
 }
 
 # Download all the episodes!
@@ -396,14 +401,18 @@ function program()
 }
 DL_ALL=false
 SEASON=false
+NO_CONFIRM=false
 # Main part of script
 OPTIND=1
 
-while getopts "hasdv" opt; do
+while getopts "hasndv" opt; do
     case "$opt" in
         h)
             usage
             exit 0
+            ;;
+        n)
+            NO_CONFIRM=true
             ;;
         v)
             echo -e "NRK-TV-Downloader v$VERSION"

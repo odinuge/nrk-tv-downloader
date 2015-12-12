@@ -7,7 +7,7 @@ Because the script relies on "HTML-Parsing" it can break at any time.
 
 This script may be useful for those who are struggeling with low bandwidth and/or bad playback performance.
 
-Current version: 0.9.9
+Current version: 0.9.91
 
 ## Install
     $ git clone https://github.com/odinuge/NRK-TV-DOWNLOADER/ --recursive
@@ -23,6 +23,7 @@ Current version: 0.9.9
     Options:
          -a download all episodes, in all seasons.
          -s download all episodes in season
+         -n skip files that exists
          -d dry run - list what is possible to download
          -v print version
          -h print this
