@@ -76,6 +76,20 @@ for downloader in $DOWNLOADERS; do
     fi
 done
 
+PROBE_BIN=""
+PROBES="ffprobe avprobe"
+for probe in $PROBES; do
+    if hash $probe 2>/dev/null; then
+        PROBE_BIN=$probe
+    fi
+
+done
+
+if [ -z "$PROBE_BIN" ]; then
+    echo "This program needs one of these probe tools: $PROBES"
+    exit 1
+fi
+
 # Check if fallback is used
 if [[ $downloader == "curl" ]]; then
     echo "Ffmpeg or avconv not found, using fallback (curl)."
@@ -200,8 +214,14 @@ function download()
     else
         # Get the length
         TMP="/tmp/${LOCAL_FILE}.output"
-        LENGTH_S=$(ffprobe -v quiet -show_format "$STREAM" | grep duration | cut -c 10-|awk '{print int($1)}')
+        LENGTH_S=$($PROBE_BIN -v quiet -show_format "$STREAM" | grep duration | cut -c 10-|awk '{print int($1)}')
         LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
+        $PROBE_BIN -v quiet -show_format "$STREAM" >/dev/null
+        if [ $? -ne 0 ]; then
+            echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
+            return
+        fi
+
         if $DRY_RUN ; then
             echo -e " - Length: $LENGTH_STAMP"
             echo -e " - Program is \e[01;32mavailable.\e[00m\n"
