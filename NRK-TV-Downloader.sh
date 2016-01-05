@@ -171,7 +171,7 @@ function download()
 
     # See if the stream is the master playlist
     if [[ "$STREAM" == *master.m3u8 ]]; then
-        STREAM=$(echo $STREAM | sed -e "s/master.m3u8/index_4_av.m3u8/g")
+        STREAM=$(getBestStream $STREAM)
 
     fi
 
@@ -284,6 +284,20 @@ function getHTMLContent()
         print
     }'
     echo $HTML | awk ${FNC/HINT/$HINT} RS="<" 2>/dev/null
+}
+
+# Get the stream with the best quality
+function getBestStream()
+{
+    local MASTER_URL=$1
+    local MASTER=$(curl $CURL_ $MASTER_URL)
+    FNC='/BANDWIDTH/{
+        match($0, /BANDWIDTH=([0-9]*)/, bitrate);
+        match($0, /(http.*$)/,url);
+        printf "%s %s\n", bitrate[1], url[1];
+    }'
+    echo $MASTER | awk "${FNC}" RS="#EXT-X-STREAM-INF" |
+        sort -n -r | awk '{print $2;exit}'
 }
 
 # Download all the episodes!
