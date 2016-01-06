@@ -1,4 +1,4 @@
-# NRK-TV-Downloader
+# nrk-tv-downloader
 This is just another simple shell-script that dumps HLS video streams from NRK-TV into a h264-MPEG-4 container.
 The script is using ffmpeg, or curl as a fallback (not the best option)
 This script has nothing to do with NRK!
@@ -10,15 +10,15 @@ This script may be useful for those who are struggeling with low bandwidth and/o
 Current version: 0.9.91
 
 ## Install
-    $ git clone https://github.com/odinuge/NRK-TV-DOWNLOADER/ --recursive
+    $ git clone https://github.com/odinuge/nrk-tv-downloader/ --recursive
 
 
 ## Usage
 
 
-    chmod +x NRK-TV-Downloader.sh
+    chmod +x nrk-tv-downloader.sh
     [...]
-    Usage: ./NRK-TV-Downloader.sh <OPTION>... [PROGRAM_URL(s)]...
+    Usage: ./nrk-tv-downloader.sh <OPTION>... [PROGRAM_URL(s)]...
 
     Options:
          -a download all episodes, in all seasons.
@@ -29,10 +29,10 @@ Current version: 0.9.91
          -h print this
 
 
-    For updates see <https://github.com/odinuge/NRK-TV-Downloader>
+    For updates see <https://github.com/odinuge/nrk-tv-downloader>
 
     Example:
-    $ ./NRK-TV-Downloader.sh -a http://tv.nrk.no/serie/tore-paa-sporet/dmpf71005710/17-02-2013
+    $ ./nrk-tv-downloader.sh -a http://tv.nrk.no/serie/tore-paa-sporet/dmpf71005710/17-02-2013
 
 ## Requirements
 This script requires bash, rev, cut, grep, sed, awk, printf and curl.
