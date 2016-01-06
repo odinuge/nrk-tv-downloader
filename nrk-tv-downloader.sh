@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# NRK-TV-Dowloader
+# nrk-tv-downloader
 #
 # The MIT License (MIT)
 #
@@ -119,7 +119,7 @@ function timer()
 # Print USAGE
 function usage()
 {
-    echo -e "NRK-TV-Downloader v$VERSION"
+    echo -e "nrk-tv-downloader v$VERSION"
     echo -e "\nUsage: \e[01;32m$0 <OPTION>... [PROGRAM_URL(s)]...\e[00m"
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
@@ -128,7 +128,7 @@ function usage()
     echo -e "\t -d dry run - list what is possible to download"
     echo -e "\t -v print version"
     echo -e "\t -h print this\n"
-    echo -e "\nFor updates see <https://github.com/odinuge/NRK-TV-Downloader>"
+    echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
 }
 
 # Get the filesize of a file
@@ -449,7 +449,7 @@ while getopts "hasndv" opt; do
             NO_CONFIRM=true
             ;;
         v)
-            echo -e "NRK-TV-Downloader v$VERSION"
+            echo -e "nrk-tv-downloader v$VERSION"
             exit 0
             ;;
         d)  DRY_RUN=true
