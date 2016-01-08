@@ -66,7 +66,7 @@ else
     SUB_DOWNLOADER=true
 fi
 
-DOWNLOADER_BIN="curl"
+DOWNLOADER_BIN=""
 DOWNLOADERS="ffmpeg avconv"
 
 # Check for ffmpeg or avconv
@@ -88,11 +88,6 @@ done
 if [ -z "$PROBE_BIN" ]; then
     echo "This program needs one of these probe tools: $PROBES"
     exit 1
-fi
-
-# Check if fallback is used
-if [[ $downloader == "curl" ]]; then
-    echo "Ffmpeg or avconv not found, using fallback (curl)."
 fi
 
 # Function to measure time
@@ -200,54 +195,48 @@ function download()
         fi
     done
 
-    if [[ "$DOWNLOADER_BIN" == "curl" ]]; then
-        # Download each part into one file
-        # Bad!!
-        for line in $playlist ; do
-            if [[ "$line" == *http* ]]; then
-                current=$((current+1))
-                echo -e "\e[01;32mDownloading part ${current} of ${total}\e[00m"
-                curl $CURL_ $line >> $LOCAL_FILE
-            fi
-        done
-        echo -e "\"$LOCAL_FILE\" downloaded..."
-    else
-        # Get the length
-        TMP="/tmp/${LOCAL_FILE}.output"
-        LENGTH_S=$($PROBE_BIN -v quiet -show_format "$STREAM" | grep duration | cut -c 10-|awk '{print int($1)}')
-        LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
-        $PROBE_BIN -v quiet -show_format "$STREAM" >/dev/null
-        if [ $? -ne 0 ]; then
-            echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
-            return
-        fi
-
-        if $DRY_RUN ; then
-            echo -e " - Length: $LENGTH_STAMP"
-            echo -e " - Program is \e[01;32mavailable.\e[00m\n"
-            return
-        fi
-
-        $DOWNLOADER_BIN -i $STREAM -c copy -loglevel 0 -stats -bsf:a aac_adtstoasc $LOCAL_FILE \
-            -y -loglevel 0 -stats 2>"$TMP"&
-        PID_=$!
-        while sleep 1;
-        do
-            line=$(cat "$TMP" | tr '\r' '\n' | tail -1)
-            curr_stamp=$(echo $line| awk -F "=" '{print $6}' | rev | cut -c 12- | rev)
-            curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
-            echo -n -e " - Status: $curr_stamp of $LENGTH_STAMP -"\
-                "$((($curr_s*100)/$LENGTH_S))%," \
-                "$(getfilesize $LOCAL_FILE)  \r"
-            kill -0 $PID_ 2>/dev/null || break;
-        done
-        echo -n -e " - Status: $LENGTH_STAMP of $LENGTH_STAMP - " \
-            "100%, " \
-            "$(getfilesize $LOCAL_FILE)"
-        echo -e "\n - Download complete"
-        rm "$TMP"
-        printf ' - Elapsed time: %s\n\n' $(timer $t)
+    # Get the length
+    local probe_info
+    probe_info=$($PROBE_BIN -v quiet -show_format "$STREAM")
+    if [ $? -ne 0 ]; then
+        echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
+        return
     fi
+    LENGTH_S=$(echo $probe_info | grep duration | cut -c 10-|awk '{print int($1)}')
+    LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
+    if $DRY_RUN ; then
+        echo -e " - Length: $LENGTH_STAMP"
+        echo -e " - Program is \e[01;32mavailable.\e[00m\n"
+        return
+    fi
+    local IS_NEWLINE=true
+    #STREAM="nnn"
+    echo -e " - Downloading program"
+    while read -d "$(echo -e -n "\r")" line;
+    do
+        line=$(echo "$line" | tr '\r' '\n')
+        if [[ $line =~ Returncode[1-9] ]]; then
+            $IS_NEWLINE || echo && IS_NEWLINE=true
+            echo -e " - \e[31mError\e[0m downloading program.\n"
+            rm $LOCAL_FILE 2>/dev/null
+            return
+        elif [[ "$line" != *bitrate* ]]; then
+            $IS_NEWLINE || echo && IS_NEWLINE=true
+            echo -e " - \e[31m${DOWNLOADER_BIN} error:\e[0m $line"
+            continue
+        fi
+        IS_NEWLINE=false
+        curr_stamp=$(echo $line| awk -F "=" '{print $6}' | rev | cut -c 12- | rev)
+        curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
+        echo -n -e "\r - Status: $curr_stamp of $LENGTH_STAMP -"\
+            "$((($curr_s*100)/$LENGTH_S))%," \
+            "$(getfilesize $LOCAL_FILE)  "
+    done < <($DOWNLOADER_BIN -i "$STREAM" -c copy -bsf:a aac_adtstoasc -stats -loglevel 16 -y $LOCAL_FILE 2>&1 || echo -e "\rReturncode$?\r")
+    echo -e "\r - Status: $LENGTH_STAMP of $LENGTH_STAMP - " \
+        "100%, " \
+        "$(getfilesize $LOCAL_FILE)"
+    echo -e " - Download complete"
+    printf ' - Elapsed time: %s\n\n' $(timer $t)
 }
 
 # Get json value from V8
