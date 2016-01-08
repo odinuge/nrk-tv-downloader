@@ -110,7 +110,12 @@ function timer()
         printf '%d:%02d:%02d' $dh $dm $ds
     fi
 }
-
+function sec_to_timestamp()
+{
+    local sec
+    read sec
+    echo $sec | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
+}
 # Print USAGE
 function usage()
 {
@@ -197,13 +202,13 @@ function download()
 
     # Get the length
     local probe_info
-    probe_info=$($PROBE_BIN -v quiet -show_format "$STREAM")
+    probe_info=$($PROBE_BIN -v quiet -show_format "$STREAM" 2>/dev/null)
     if [ $? -ne 0 ]; then
         echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
         return
     fi
-    LENGTH_S=$(echo $probe_info | grep duration | cut -c 10-|awk '{print int($1)}')
-    LENGTH_STAMP=$(echo $LENGTH_S | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}')
+    LENGTH_S=$(echo "$probe_info" | grep duration | cut -c 10-|awk '{print int($1)}')
+    LENGTH_STAMP=$(echo $LENGTH_S | sec_to_timestamp)
     if $DRY_RUN ; then
         echo -e " - Length: $LENGTH_STAMP"
         echo -e " - Program is \e[01;32mavailable.\e[00m\n"
@@ -226,12 +231,17 @@ function download()
             continue
         fi
         IS_NEWLINE=false
-        curr_stamp=$(echo $line| awk -F "=" '{print $6}' | rev | cut -c 12- | rev)
+        local curr_stamp=$(echo $line| awk -F "=" '/time=/{print}' RS=" ")
+        if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
+            curr_stamp=$(echo $curr_stamp | cut -c 6-13)
+        else
+            curr_stamp=$(echo $curr_stamp | cut -c 6- | sec_to_timestamp)
+        fi
         curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
         echo -n -e "\r - Status: $curr_stamp of $LENGTH_STAMP -"\
             "$((($curr_s*100)/$LENGTH_S))%," \
             "$(getfilesize $LOCAL_FILE)  "
-    done < <($DOWNLOADER_BIN -i "$STREAM" -c copy -bsf:a aac_adtstoasc -stats -loglevel 16 -y $LOCAL_FILE 2>&1 || echo -e "\rReturncode$?\r")
+    done < <($DOWNLOADER_BIN -i "$STREAM" -c copy -bsf:a aac_adtstoasc -stats -loglevel info -y $LOCAL_FILE 2>&1 || echo -e "\rReturncode$?\r")
     echo -e "\r - Status: $LENGTH_STAMP of $LENGTH_STAMP - " \
         "100%, " \
         "$(getfilesize $LOCAL_FILE)"
