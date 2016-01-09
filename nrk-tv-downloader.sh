@@ -34,14 +34,14 @@ VERSION="0.9.91"
 DEPS="sed awk printf curl cut grep rev"
 DRY_RUN=false
 
+# Curl flags (for making it silent)
+readonly CURL_="-s"
+
 # Check the shell
 if [ -z "$BASH_VERSION" ]; then
     echo -e "This script needs bash"
     exit 1
 fi
-
-# Curl flags (for making it silent)
-CURL_="-s"
 
 # Checking dependencies
 for dep in $DEPS; do
@@ -60,27 +60,32 @@ if [ $? -ne 0 ]; then
     DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
     if [ -f "$DIR/tt-to-subrip/tt-to-subrip.awk" ]; then
         alias "tt-to-subrip"="$DIR/tt-to-subrip/tt-to-subrip.awk"
-        SUB_DOWNLOADER=true
+        readonly SUB_DOWNLOADER=true
     fi
 else
-    SUB_DOWNLOADER=true
+    readonly SUB_DOWNLOADER=true
 fi
 
 DOWNLOADER_BIN=""
-DOWNLOADERS="ffmpeg avconv"
+readonly DOWNLOADERS="ffmpeg avconv"
 
 # Check for ffmpeg or avconv
 for downloader in $DOWNLOADERS; do
     if hash $downloader 2>/dev/null; then
-        DOWNLOADER_BIN=$downloader
+        readonly DOWNLOADER_BIN=$downloader
     fi
 done
 
+if [ -z $DOWNLOADER_BIN ]; then
+    echo "This program needs one of these tools: $DOWNLOADERS"
+    exit 1
+fi
+
 PROBE_BIN=""
-PROBES="ffprobe avprobe"
+readonly PROBES="ffprobe avprobe"
 for probe in $PROBES; do
     if hash $probe 2>/dev/null; then
-        PROBE_BIN=$probe
+        readonly PROBE_BIN=$probe
     fi
 
 done
@@ -134,30 +139,30 @@ function usage()
 # Get the filesize of a file
 function getfilesize()
 {
-    local FILE=$1
-    du -h $FILE 2>/dev/null | awk '{print $1}'
+    local file=$1
+    du -h $file 2>/dev/null | awk '{print $1}'
 }
 
 # Download a stream $1, to a local file $2
 function download()
 {
 
-    local STREAM=$1
-    local LOCAL_FILE=$2
+    local stream=$1
+    local localfile=$2
 
 
-    if [ -z $STREAM ] ; then
+    if [ -z $stream ] ; then
         echo -e  "No stream provided"
         exit 1
     fi
 
-    if [ -z $LOCAL_FILE ] ; then
+    if [ -z $localfile ] ; then
         echo -e  "No local file provided"
         exit 1
     fi
 
-    if [ -f $LOCAL_FILE ] && ! $DRY_RUN; then
-        echo -n " - $LOCAL_FILE exists, overwrite? [y/N]: "
+    if [ -f $localfile ] && ! $DRY_RUN; then
+        echo -n " - $localfile exists, overwrite? [y/N]: "
         if $NO_CONFIRM; then
             echo -e "\n - Skipping program, \e[32malready downloaded\e[00m\n"
             return
@@ -167,9 +172,9 @@ function download()
         if [ -z $ans ]; then
             return
         elif [ $ans = 'y' ]; then
-            rm $LOCAL_FILE
+            rm $localfile
         elif [ $ans = 'Y' ]; then
-            rm $LOCAL_FILE
+            rm $localfile
         else
             return
         fi
@@ -177,60 +182,52 @@ function download()
 
     # Make sure it is HLS, not flash
     # if it is flash, change url to HLS
-    if [[ $STREAM == *manifest.f4m ]]; then
+    if [[ $stream == *manifest.f4m ]]; then
         #Replacing char(s)
-        STREAM=$(echo $STREAM | sed -e 's/z/i/g')
-        STREAM=$(echo $STREAM | sed -e 's/manifest.f4m/master.m3u8/g')
+        stream=$(echo $stream | sed -e 's/z/i/g')
+        stream=$(echo $stream | sed -e 's/manifest.f4m/master.m3u8/g')
     fi
 
     # See if the stream is the master playlist
-    if [[ "$STREAM" == *master.m3u8 ]]; then
-        STREAM=$(getBestStream $STREAM)
+    if [[ "$stream" == *master.m3u8 ]]; then
+        stream=$(getBestStream $stream)
 
     fi
 
     # Start timer
-    t=$(timer)
-
-    playlist=$(curl $CURL_ ${STREAM})
-
-    for line in $playlist ; do
-        if [[ "$line" == *http* ]]; then
-            total=$((total+1))
-        fi
-    done
+    local t=$(timer)
 
     # Get the length
     local probe_info
-    probe_info=$($PROBE_BIN -v quiet -show_format "$STREAM" 2>/dev/null)
+    probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null)
     if [ $? -ne 0 ]; then
         echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
         return
     fi
-    LENGTH_S=$(echo "$probe_info" | grep duration | cut -c 10-|awk '{print int($1)}')
-    LENGTH_STAMP=$(echo $LENGTH_S | sec_to_timestamp)
+    local length_sec=$(echo "$probe_info" | grep duration | cut -c 10-|awk '{print int($1)}')
+    local length_stamp=$(echo $length_sec | sec_to_timestamp)
     if $DRY_RUN ; then
-        echo -e " - Length: $LENGTH_STAMP"
+        echo -e " - Length: $length_stamp"
         echo -e " - Program is \e[01;32mavailable.\e[00m\n"
         return
     fi
-    local IS_NEWLINE=true
-    #STREAM="nnn"
+    local is_newline=true
+    #stream="nnn"
     echo -e " - Downloading program"
     while read -d "$(echo -e -n "\r")" line;
     do
         line=$(echo "$line" | tr '\r' '\n')
         if [[ $line =~ Returncode[1-9] ]]; then
-            $IS_NEWLINE || echo && IS_NEWLINE=true
+            $is_newline || echo && is_newline=true
             echo -e " - \e[31mError\e[0m downloading program.\n"
-            rm $LOCAL_FILE 2>/dev/null
+            rm $localfile 2>/dev/null
             return
         elif [[ "$line" != *bitrate* ]]; then
-            $IS_NEWLINE || echo && IS_NEWLINE=true
+            $is_newline || echo && is_newline=true
             echo -e " - \e[31m${DOWNLOADER_BIN} error:\e[0m $line"
             continue
         fi
-        IS_NEWLINE=false
+        is_newline=false
         local curr_stamp=$(echo $line| awk -F "=" '/time=/{print}' RS=" ")
         if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
             curr_stamp=$(echo $curr_stamp | cut -c 6-13)
@@ -238,115 +235,115 @@ function download()
             curr_stamp=$(echo $curr_stamp | cut -c 6- | sec_to_timestamp)
         fi
         curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
-        echo -n -e "\r - Status: $curr_stamp of $LENGTH_STAMP -"\
-            "$((($curr_s*100)/$LENGTH_S))%," \
-            "$(getfilesize $LOCAL_FILE)  "
-    done < <($DOWNLOADER_BIN -i "$STREAM" -c copy -bsf:a aac_adtstoasc -stats -loglevel info -y $LOCAL_FILE 2>&1 || echo -e "\rReturncode$?\r")
-    echo -e "\r - Status: $LENGTH_STAMP of $LENGTH_STAMP - " \
+        echo -n -e "\r - Status: $curr_stamp of $length_stamp -"\
+            "$((($curr_s*100)/$length_sec))%," \
+            "$(getfilesize $localfile)  "
+    done < <($DOWNLOADER_BIN -i "$stream" -c copy -bsf:a aac_adtstoasc -stats -loglevel info -y $localfile 2>&1 || echo -e "\rReturncode$?\r")
+    echo -e "\r - Status: $length_stamp of $length_stamp - " \
         "100%, " \
-        "$(getfilesize $LOCAL_FILE)"
+        "$(getfilesize $localfile)"
     echo -e " - Download complete"
     printf ' - Elapsed time: %s\n\n' $(timer $t)
 }
 
-# Get json value from V8
-function parseJSON()
+# Get json value from v8
+function parsejson()
 {
-    local JSON=$1
-    local TAG=$2
-    local FNC='
+    local json=$1
+    local tag=$2
+    local fnc='
     BEGIN{
         RS="{\"|,\"";
         FS="\":";
     }
-    /TAG/{
+    /tag/{
         gsub("\"","",$2);
         print $2;
     }'
-    FNC="${FNC/TAG/$TAG}"
-    echo $JSON | awk "$FNC"
+    fnc="${fnc/tag/$tag}"
+    echo $json | awk "$fnc"
 }
 
 # Get an attribute from a html tag
-function getHTMLAttr()
+function gethtmlAttr()
 {
-    local HTML=$1
-    local LINE_HINT=$2
-    local ATTR=$3
-    local FNC='
-    /HINT/ {
-        gsub( ".*ATTR=\"", "" );
+    local html=$1
+    local hint=$2
+    local attr=$3
+    local fnc='
+    /hint/ {
+        gsub( ".*attr=\"", "" );
         gsub( "\".*", "" );
         print;
     }'
-    FNC=${FNC/HINT/$LINE_HINT}
-    FNC=${FNC/ATTR/$ATTR}
-    echo $HTML | awk "${FNC}" RS="[<>]"
+    fnc=${fnc/hint/$hint}
+    fnc=${fnc/attr/$attr}
+    echo $html | awk "${fnc}" RS="[<>]"
 }
 
 # Get the content of a meta tag
-function getHTMLMeta()
+function gethtmlMeta()
 {
-    local HTML=$1
-    local NAME=$2
-    getHTMLAttr "$HTML" "meta name=\"$NAME\"" "content"
+    local html=$1
+    local name=$2
+    gethtmlAttr "$html" "meta name=\"$name\"" "content"
 }
 
-# Get the content inside a HTML-Tag
-function getHTMLContent()
+# Get the content inside a html-Tag
+function gethtmlContent()
 {
-    local HTML=$1
-    local HINT=$2
-    FNC='/HINT/{
+    local html=$1
+    local hint=$2
+    local fnc='/hint/{
         gsub(".*>","");
         $1=$1;
         print
     }'
-    echo $HTML | awk ${FNC/HINT/$HINT} RS="<" 2>/dev/null
+    echo $html | awk ${fnc/hint/$hint} RS="<" 2>/dev/null
 }
 
 # Get the stream with the best quality
 function getBestStream()
 {
-    local MASTER_URL=$1
-    local MASTER=$(curl $CURL_ $MASTER_URL)
-    FNC='/BANDWIDTH/{
+    local master=$1
+    local master_html=$(curl $CURL_ $master)
+    local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
         match($0, /(http.*$)/,url);
         printf "%s %s\n", bitrate[1], url[1];
     }'
-    echo $MASTER | awk "${FNC}" RS="#EXT-X-STREAM-INF" |
+    echo $master_html | awk "${fnc}" RS="#EXT-X-STREAM-INF" |
         sort -n -r | awk '{print $2;exit}'
 }
 
 # Download all the episodes!
 function program_all()
 {
-    local URL=$1
-    local SEASON=$2
-    HTML=$(curl $CURL_ $URL)
-    Program_ID=$(getHTMLAttr "$HTML" "programid")
+    local url=$1
+    local season=$2
+    local html=$(curl $CURL_ $url)
+    local program_id=$(gethtmlAttr "$html" "programid")
 
-    SEASONS=$(getHTMLAttr "$HTML" "data-season" "data-season")
-    if $SEASON ; then
-        SEASONS=$(getHTMLAttr "$HTML" "seasonid")
+    local seasons=$(gethtmlAttr "$html" "data-season" "data-season")
+    if $season ; then
+        seasons=$(gethtmlAttr "$html" "seasonid")
     fi
-    SERIES_NAME=$(getHTMLMeta "$HTML" "seriesid")
+    series_name=$(gethtmlMeta "$html" "seriesid")
 
     # Loop through all seasons, or just the selected one
-    for season in $SEASONS ; do
-        URL="https://tv.nrk.no/program/Episodes/$SERIES_NAME/$season"
+    for season in $seasons ; do
+        local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
         if [ $season = "extra" ]; then
-            URL="https://tv.nrk.no/extramaterial/$SERIES_NAME"
+            url="https://tv.nrk.no/extramaterial/$series_name"
         fi
-        S_HTML=$(curl $CURL_ $URL)
-        EPISODES=$(getHTMLAttr "$S_HTML" "data-episode" "data-episode")
-        SEASON_NAME=$(getHTMLContent "$S_HTML" "h1")
-        echo -n "Downloading $SEASON_NAME"
+        local s_html=$(curl $CURL_ $url)
+        local episodes=$(gethtmlAttr "$s_html" "data-episode" "data-episode")
+        season_name=$(gethtmlContent "$s_html" "h1")
+        echo -n "Downloading $season_name"
 
         # loop through all the episodes
-        for episode in $EPISODES ; do
-            program "https://tv.nrk.no/serie/$SERIES_NAME/$episode"
+        for episode in $episodes ; do
+            program "https://tv.nrk.no/serie/$series_name/$episode"
         done
 
     done
@@ -355,80 +352,81 @@ function program_all()
 # Download program from url $1, to a local file $2 (if provided)
 function program()
 {
-    local URL=$1
+    local url=$1
 
-    HTML=$(curl $CURL_ -L $URL)
+    local html=$(curl $CURL_ -L $url)
 
     # See if program has more than one part
-    STREAMS=$(getHTMLAttr "$HTML" "data-method=\"playStream\"" "data-argument")
+    local streams=$(gethtmlAttr "$html" "data-method=\"playStream\"" "data-argument")
 
-    Program_ID=$(getHTMLMeta "$HTML" "programid")
+    local program_id=$(gethtmlMeta "$html" "programid")
 
-    # Fetch the info with the V8-API
-    V8=$(curl $CURL_ "http://v8.psapi.nrk.no/mediaelement/${Program_ID}")
-    TITLE=$(parseJSON "$V8" "fullTitle")
+    # Fetch the info with the v8-API
+    local v8=$(curl $CURL_ "http://v8.psapi.nrk.no/mediaelement/${program_id}")
+    local title=$(parsejson "$v8" "fullTitle")
 
-    SEASON=$(parseJSON "$V8" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
+    local season=$(parsejson "$v8" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
 
-    TITLE="$TITLE$SEASON"
-    echo "Downloading \"$TITLE\" "
+    title="$title$season"
+    echo "Downloading \"$title\" "
 
     # TODO FIXME Fix the name of the file
-    FILE="$TITLE"
-    FILE="${FILE// /_}"
-    FILE="${FILE//&#230;/ae}"
-    FILE="${FILE//ø/o}"
-    FILE="${FILE//å/aa}"
-    FILE="${FILE//:/-}"
+    local localfile="$title"
+    localfile="${localfile// /_}"
+    localfile="${localfile//&#230;/ae}"
+    localfile="${localfile//ø/o}"
+    localfile="${localfile//å/aa}"
+    localfile="${localfile//:/-}"
 
     # Check if program has a valid subtitle
-    HAS_SUB=$(parseJSON "$V8" "hasSubtitles")
+    local subtitle=$(parsejson "$v8" "hasSubtitles")
 
-    if [ $HAS_SUB == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
+    if [ $subtitle == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
 
-        curl $CURL_ "http://v8.psapi.nrk.no/programs/$Program_ID/subtitles/tt" | \
-            tt-to-subrip > "$FILE.srt"
+        curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" | \
+            tt-to-subrip > "$localfile.srt"
     elif $SUB_DOWNLOADER ; then
-        if [ $HAS_SUB == "True" ] ; then
+        if [ $subtitle == "True" ] ; then
             echo " - Subtitle is available"
         else
             echo " - Subtitle is not available"
         fi
     fi
 
-    if [[ -z $STREAMS ]]; then
+    local parts
+    if [[ -z $streams ]]; then
         # Only one part
-        STREAMS=$(getHTMLAttr "$HTML" "div id=\"playerelement\"" "data-media")
+        streams=$(gethtmlAttr "$html" "div id=\"playerelement\"" "data-media")
         # If stream is unable to be found,
         # make the user use "stream"
-        if [[ ! $STREAMS == *"akamaihd.net"* ]]; then
-            message=$(parseJSON "$V8" "messageType" | \
+        if [[ ! $streams == *"akamaihd.net"* ]]; then
+            message=$(parsejson "$v8" "messageType" | \
                 awk '{gsub("[A-Z]"," &");print tolower($0)}')
             echo -e " - Program is \e[31mnot available\e[0m:$message\n"
             return
         fi
-        PARTS=false
+        parts=false
     else
         # Several parts
-        PARTS=true
+        parts=true
     fi
     # Download the stream(s)
-    for STREAM in $STREAMS ; do
+    for stream in $streams ; do
 
-        if $PARTS ; then
-            part=$((part+1))
-            MORE="-Part_$part"
-            FILE="${FILE// /_}$MORE"
+        if $parts ; then
+            local part=$((part+1))
+            local more="-Part_$part"
+            localfile="${localfile// /_}$more"
         fi
 
 
-        if [[ $FILE != *.mp4 && $FILE != *.mkv ]]; then
-            FILE="${FILE}.mp4"
+        if [[ $localfile != *.mp4 && $localfile != *.mkv ]]; then
+            localfile="${localfile}.mp4"
         fi
 
         # Download the stream
-        download $STREAM $FILE
+        download $stream $localfile
     done
 
 }
