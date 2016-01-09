@@ -27,7 +27,6 @@
 # Contributors:
 # Henrik Lilleengen <mail@ithenrik.com>
 #
-
 shopt -s expand_aliases
 
 VERSION="0.9.91"
@@ -119,7 +118,8 @@ function sec_to_timestamp()
 {
     local sec
     read sec
-    echo $sec | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
+    echo $sec \
+        | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
 }
 # Print USAGE
 function usage()
@@ -204,8 +204,12 @@ function download()
         echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
         return
     fi
-    local length_sec=$(echo "$probe_info" | grep duration | cut -c 10-|awk '{print int($1)}')
-    local length_stamp=$(echo $length_sec | sec_to_timestamp)
+    local length_sec=$(echo "$probe_info" \
+        | grep duration \
+        | cut -c 10-\
+        | awk '{print int($1)}')
+    local length_stamp=$(echo $length_sec \
+        | sec_to_timestamp)
     if $DRY_RUN ; then
         echo -e " - Length: $length_stamp"
         echo -e " - Program is \e[01;32mavailable.\e[00m\n"
@@ -228,17 +232,24 @@ function download()
             continue
         fi
         is_newline=false
-        local curr_stamp=$(echo $line| awk -F "=" '/time=/{print}' RS=" ")
+        local curr_stamp=$(echo $line\
+            | awk -F "=" '/time=/{print}' RS=" ")
         if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
             curr_stamp=$(echo $curr_stamp | cut -c 6-13)
         else
-            curr_stamp=$(echo $curr_stamp | cut -c 6- | sec_to_timestamp)
+            curr_stamp=$(echo $curr_stamp \
+                | cut -c 6- \
+                | sec_to_timestamp)
         fi
-        curr_s=$(echo $curr_stamp | tr ":" " " | awk '{sec = $1*60*60+$2*60+$3;print sec}')
+        curr_s=$(echo $curr_stamp \
+            | tr ":" " " \
+            | awk '{sec = $1*60*60+$2*60+$3;print sec}')
         echo -n -e "\r - Status: $curr_stamp of $length_stamp -"\
             "$((($curr_s*100)/$length_sec))%," \
             "$(getfilesize $localfile)  "
-    done < <($DOWNLOADER_BIN -i "$stream" -c copy -bsf:a aac_adtstoasc -stats -loglevel info -y $localfile 2>&1 || echo -e "\rReturncode$?\r")
+    done < <($DOWNLOADER_BIN -i "$stream" -c copy \
+        -bsf:a aac_adtstoasc -stats -loglevel info -y $localfile 2>&1 \
+        || echo -e "\rReturncode$?\r")
     echo -e "\r - Status: $length_stamp of $length_stamp - " \
         "100%, " \
         "$(getfilesize $localfile)"
@@ -312,8 +323,10 @@ function getBestStream()
         match($0, /(http.*$)/,url);
         printf "%s %s\n", bitrate[1], url[1];
     }'
-    echo $master_html | awk "${fnc}" RS="#EXT-X-STREAM-INF" |
-        sort -n -r | awk '{print $2;exit}'
+    echo $master_html \
+        | awk "${fnc}" RS="#EXT-X-STREAM-INF" \
+        | sort -n -r \
+        | awk '{print $2;exit}'
 }
 
 # Download all the episodes!
@@ -357,15 +370,18 @@ function program()
     local html=$(curl $CURL_ -L $url)
 
     # See if program has more than one part
-    local streams=$(gethtmlAttr "$html" "data-method=\"playStream\"" "data-argument")
+    local streams=$(gethtmlAttr "$html" \
+        "data-method=\"playStream\"" "data-argument")
 
     local program_id=$(gethtmlMeta "$html" "programid")
 
     # Fetch the info with the v8-API
-    local v8=$(curl $CURL_ "http://v8.psapi.nrk.no/mediaelement/${program_id}")
+    local v8=$(curl $CURL_ \
+        "http://v8.psapi.nrk.no/mediaelement/${program_id}")
     local title=$(parsejson "$v8" "fullTitle")
 
-    local season=$(parsejson "$v8" "relativeOriginUrl" | awk '/sesong/{printf(" %s", $0)}' RS='/')
+    local season=$(parsejson "$v8" "relativeOriginUrl" \
+        | awk '/sesong/{printf(" %s", $0)}' RS='/')
 
     title="$title$season"
     echo "Downloading \"$title\" "
@@ -384,8 +400,8 @@ function program()
     if [ $subtitle == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
 
-        curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" | \
-            tt-to-subrip > "$localfile.srt"
+        curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
+            | tt-to-subrip > "$localfile.srt"
     elif $SUB_DOWNLOADER ; then
         if [ $subtitle == "True" ] ; then
             echo " - Subtitle is available"
@@ -401,8 +417,8 @@ function program()
         # If stream is unable to be found,
         # make the user use "stream"
         if [[ ! $streams == *"akamaihd.net"* ]]; then
-            message=$(parsejson "$v8" "messageType" | \
-                awk '{gsub("[A-Z]"," &");print tolower($0)}')
+            message=$(parsejson "$v8" "messageType" \
+                | awk '{gsub("[A-Z]"," &");print tolower($0)}')
             echo -e " - Program is \e[31mnot available\e[0m:$message\n"
             return
         fi
@@ -476,11 +492,7 @@ do
             download $var
             ;;
         *tv.nrk.no*)
-            if $DL_ALL ; then
-                program_all $var
-            else
-                program $var
-            fi
+            $DL_ALL && program_all $var $SEASON || program $var
             ;;
         *)
             usage
