@@ -30,7 +30,7 @@
 shopt -s expand_aliases
 
 VERSION="0.9.91"
-DEPS="sed awk printf curl cut grep rev"
+DEPS="sed awk gawk printf curl cut grep rev"
 DRY_RUN=false
 
 # Curl flags (for making it silent)
