@@ -2,29 +2,8 @@
 #
 # nrk-tv-downloader
 #
-# The MIT License (MIT)
-#
-# Copyright (c) 2015 Odin Ugedal <odin@ugedal.com>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-#
 # Contributors:
+# Odin Ugedal <odin@ugedal.com>
 # Henrik Lilleengen <mail@ithenrik.com>
 #
 shopt -s expand_aliases
@@ -120,6 +99,7 @@ function sec_to_timestamp()
     echo $sec \
         | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
 }
+
 # Print USAGE
 function usage()
 {
@@ -130,7 +110,6 @@ function usage()
     echo -e "\t -s download all episodes in season"
     echo -e "\t -n skip files that exists"
     echo -e "\t -d dry run - list what is possible to download"
-    echo -e "\t -v print version"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
 }
@@ -214,8 +193,8 @@ function download()
         echo -e " - Program is \e[01;32mavailable.\e[00m\n"
         return
     fi
+
     local is_newline=true
-    #stream="nnn"
     echo -e " - Downloading program"
     while read -d "$(echo -e -n "\r")" line;
     do
@@ -451,7 +430,7 @@ NO_CONFIRM=false
 # Main part of script
 OPTIND=1
 
-while getopts "hasndv" opt; do
+while getopts "hasnu" opt; do
     case "$opt" in
         h)
             usage
@@ -459,10 +438,6 @@ while getopts "hasndv" opt; do
             ;;
         n)
             NO_CONFIRM=true
-            ;;
-        v)
-            echo -e "nrk-tv-downloader v$VERSION"
-            exit 0
             ;;
         d)  DRY_RUN=true
             ;;

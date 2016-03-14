@@ -5,8 +5,6 @@
 
 ## About
 
-
-
 This is just another simple shell-script that dumps HLS video streams from NRK-TV into a h264-MPEG-4 container.
 
 It downloads the subtitle (if available), and displays the progress. Can be used to download whole seasons.
@@ -30,7 +28,6 @@ This script has nothing to do with NRK!
          -s download all episodes in season
          -n skip files that exists
          -d dry run - list what is possible to download
-         -v print version
          -h print this
 
 
