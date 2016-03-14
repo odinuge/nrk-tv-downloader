@@ -29,7 +29,6 @@
 #
 shopt -s expand_aliases
 
-VERSION="0.9.91"
 DEPS="sed awk gawk printf curl cut grep rev"
 DRY_RUN=false
 
@@ -124,7 +123,7 @@ function sec_to_timestamp()
 # Print USAGE
 function usage()
 {
-    echo -e "nrk-tv-downloader v$VERSION"
+    echo -e "nrk-tv-downloader "
     echo -e "\nUsage: \e[01;32m$0 <OPTION>... [PROGRAM_URL(s)]...\e[00m"
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
