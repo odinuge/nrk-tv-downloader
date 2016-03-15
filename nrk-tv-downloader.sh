@@ -286,9 +286,10 @@ function gethtmlContent()
     local fnc='/hint/{
         gsub(".*>","");
         $1=$1;
-        print
+        print;
+        exit;
     }'
-    echo $html | awk ${fnc/hint/$hint} RS="<" 2>/dev/null
+    echo $html | awk "${fnc/hint/$hint}" RS="<" ORS=""
 }
 
 # Get the stream with the best quality
@@ -329,9 +330,12 @@ function program_all()
         fi
         local s_html=$(curl $CURL_ $url)
         local episodes=$(gethtmlAttr "$s_html" "data-episode" "data-episode")
-        season_name=$(gethtmlContent "$s_html" "h1")
-        echo -n "Downloading $season_name"
+        local season_name=$(gethtmlContent "$s_html" "h1>")
 
+        if [ $season = "extra" ]; then
+            season_name="extramaterial"
+        fi
+        echo -e "Downloading \"$season_name\""
         # loop through all the episodes
         for episode in $episodes ; do
             program "https://tv.nrk.no/serie/$series_name/$episode"
@@ -381,7 +385,7 @@ function program()
         curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
             | tt-to-subrip > "$localfile.srt"
     elif $SUB_DOWNLOADER ; then
-        if [ $subtitle == "True" ] ; then
+        if [ $subtitle == "true" ] ; then
             echo " - Subtitle is available"
         else
             echo " - Subtitle is not available"
@@ -430,7 +434,7 @@ NO_CONFIRM=false
 # Main part of script
 OPTIND=1
 
-while getopts "hasnu" opt; do
+while getopts "hasnud" opt; do
     case "$opt" in
         h)
             usage
