@@ -179,7 +179,7 @@ function download()
     local probe_info
     probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null)
     if [ $? -ne 0 ]; then
-        echo -e " - Program is \e[31mnot available\e[0m: streamerror\n"
+        echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[31mnot available\e[0m: streamerror\n"
         return
     fi
     local length_sec=$(echo "$probe_info" \
@@ -190,12 +190,20 @@ function download()
         | sec_to_timestamp)
     if $DRY_RUN ; then
         echo -e " - Length: $length_stamp"
-        echo -e " - Program is \e[01;32mavailable.\e[00m\n"
+        echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[01;32mavailable.\e[00m\n"
         return
     fi
 
     local is_newline=true
-    echo -e " - Downloading program"
+    echo -e " - Downloading" $($IS_RADIO && echo radio || echo tv)  "program"
+
+    local downloader_params
+    if $IS_RADIO; then
+        downloader_params="-codec:a libmp3lame -qscale:a 2 -loglevel info"
+    else
+        downloader_params="-c copy -bsf:a aac_adtstoasc -stats -loglevel info"
+    fi
+
     while read -d "$(echo -e -n "\r")" line;
     do
         line=$(echo "$line" | tr '\r' '\n')
@@ -225,9 +233,11 @@ function download()
         echo -n -e "\r - Status: $curr_stamp of $length_stamp -"\
             "$((($curr_s*100)/$length_sec))%," \
             "$(getfilesize $localfile)  "
-    done < <($DOWNLOADER_BIN -i "$stream" -c copy \
-        -bsf:a aac_adtstoasc -stats -loglevel info -y $localfile 2>&1 \
-        || echo -e "\rReturncode$?\r")
+    done < <($DOWNLOADER_BIN -i "$stream" \
+        $downloader_params \
+        -y $localfile 2>&1 \
+        || echo -e "\rReturncode$?\r"
+)
     echo -e "\r - Status: $length_stamp of $length_stamp - " \
         "100%, " \
         "$(getfilesize $localfile)"
@@ -384,7 +394,7 @@ function program()
 
         curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
             | tt-to-subrip > "$localfile.srt"
-    elif $SUB_DOWNLOADER ; then
+    elif $SUB_DOWNLOADER && ! $IS_RADIO; then
         if [ $subtitle == "true" ] ; then
             echo " - Subtitle is available"
         else
@@ -401,7 +411,7 @@ function program()
         if [[ ! $streams == *"akamaihd.net"* ]]; then
             message=$(parsejson "$v8" "messageType" \
                 | awk '{gsub("[A-Z]"," &");print tolower($0)}')
-            echo -e " - Program is \e[31mnot available\e[0m:$message\n"
+            echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[31mnot available\e[0m:$message\n"
             return
         fi
         parts=false
@@ -418,8 +428,9 @@ function program()
             localfile="${localfile// /_}$more"
         fi
 
-
-        if [[ $localfile != *.mp4 && $localfile != *.mkv ]]; then
+        if $IS_RADIO; then
+            localfile="${localfile}.mp3"
+        elif [[ $localfile != *.mp4 && $localfile != *.mkv ]]; then
             localfile="${localfile}.mp4"
         fi
 
@@ -429,6 +440,7 @@ function program()
 
 }
 DL_ALL=false
+IS_RADIO=false
 SEASON=false
 NO_CONFIRM=false
 # Main part of script
@@ -468,6 +480,10 @@ do
 
         *akamaihd.net*)
             download $var
+            ;;
+        *radio.nrk.no*)
+            IS_RADIO=true
+            $DL_ALL && program_all $var $SEASON || program $var
             ;;
         *tv.nrk.no*)
             $DL_ALL && program_all $var $SEASON || program $var
