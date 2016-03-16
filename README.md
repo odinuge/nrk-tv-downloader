@@ -1,13 +1,11 @@
 # nrk-tv-downloader
-> Shell-script for downloading content from nrk-tv
+> Shell-script for downloading content from nrk-tv and nrk-radio
 
 ![Terminal with nrk-tv-downloader](screenshot.png)
 
 ## About
 
-This is just another simple shell-script that dumps HLS video streams from NRK-TV into a h264-MPEG-4 container.
-
-It downloads the subtitle (if available), and displays the progress. Can be used to download whole seasons.
+This is just another simple shell-script that downloads programs from nrk-tv. It also supports nrk-radio.
 
 This script has nothing to do with NRK!
 
