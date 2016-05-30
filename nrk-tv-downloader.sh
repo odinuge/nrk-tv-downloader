@@ -128,7 +128,6 @@ function download()
     local stream=$1
     local localfile=$2
 
-
     if [ -z $stream ] ; then
         echo -e  "No stream provided"
         exit 1
@@ -168,8 +167,7 @@ function download()
 
     # See if the stream is the master playlist
     if [[ "$stream" == *master.m3u8 ]]; then
-        stream=$(getBestStream $stream)
-
+        stream="$(getBestStream "$stream")"
     fi
 
     # Start timer
@@ -309,13 +307,20 @@ function getBestStream()
     local master_html=$(curl $CURL_ $master)
     local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
-        match($0, /(http.*$)/,url);
+        match($0, /(http.*$|index.*$)/,url);
         printf "%s %s\n", bitrate[1], url[1];
     }'
-    echo $master_html \
+    local new_stream=$(echo "$master_html" \
         | awk "${fnc}" RS="#EXT-X-STREAM-INF" \
         | sort -n -r \
-        | awk '{print $2;exit}'
+        | awk '{print $2;exit}')
+
+    if [[ "$new_stream" == "index*" ]]; then
+        new_stream=$(echo $master | tr 'master.m3u8' "$new_stream")
+    fi
+
+    echo "$stream"
+
 }
 
 # Download all the episodes!
@@ -361,15 +366,13 @@ function program()
 
     local html=$(curl $CURL_ -L $url)
 
-    # See if program has more than one part
-    local streams=$(gethtmlAttr "$html" \
-        "data-method=\"playStream\"" "data-argument")
-
     local program_id=$(gethtmlMeta "$html" "programid")
 
     # Fetch the info with the v8-API
     local v8=$(curl $CURL_ \
         "http://v8.psapi.nrk.no/mediaelement/${program_id}")
+
+    local streams=$(parsejson "$v8" "url")
     local title=$(parsejson "$v8" "fullTitle")
 
     local season=$(parsejson "$v8" "relativeOriginUrl" \
