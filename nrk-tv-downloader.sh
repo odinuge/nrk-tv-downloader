@@ -365,7 +365,6 @@ function program()
     local url=$1
 
     local html=$(curl $CURL_ -L $url)
-
     local program_id=$(gethtmlMeta "$html" "programid")
 
     # Fetch the info with the v8-API
@@ -374,7 +373,6 @@ function program()
 
     local streams=$(parsejson "$v8" "url")
     local title=$(parsejson "$v8" "fullTitle")
-
     local season=$(parsejson "$v8" "relativeOriginUrl" \
         | awk '/sesong/{printf(" %s", $0)}' RS='/')
 
@@ -394,7 +392,6 @@ function program()
 
     if [ $subtitle == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
         echo " - Downloading subtitle"
-
         curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
             | tt-to-subrip > "$localfile.srt"
     elif $SUB_DOWNLOADER && ! $IS_RADIO; then
@@ -405,36 +402,31 @@ function program()
         fi
     fi
 
-    local parts
     if [[ -z $streams ]]; then
-        # Only one part
-        streams=$(gethtmlAttr "$html" "div id=\"playerelement\"" "data-media")
-        # If stream is unable to be found,
-        # make the user use "stream"
-        if [[ ! $streams == *"akamaihd.net"* ]]; then
-            message=$(parsejson "$v8" "messageType" \
-                | awk '{gsub("[A-Z]"," &");print tolower($0)}')
-            echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[31mnot available\e[0m:$message\n"
-            return
-        fi
-        parts=false
-    else
-        # Several parts
-        parts=true
+        local message=$(parsejson "$v8" "messageType" \
+            | awk '{gsub("[A-Z]"," &");print tolower($0)}')
+        echo -e " -" $($IS_RADIO && echo Radio || echo Tv) \
+            "program is \e[31mnot available\e[0m:$message\n"
+        return
     fi
+
+    local num_streams=$(echo "$streams" |  wc -w )
+    local part=0
+
     # Download the stream(s)
     for stream in $streams ; do
+        local dl_file="$localfile"
 
-        if $parts ; then
-            local part=$((part+1))
-            local more="-Part_$part"
-            localfile="${localfile// /_}$more"
+        if (( "$num_streams" > 1 )) ; then
+            part=$((part+1))
+            local more="-part_$part"
+            dl_file="${dl_file// /_}$more"
         fi
 
         if $IS_RADIO; then
-            localfile="${localfile}.mp3"
+            dl_file="${dl_file}.mp3"
         elif [[ $localfile != *.mp4 && $localfile != *.mkv ]]; then
-            localfile="${localfile}.mp4"
+            dl_file="${dl_file}.mp4"
         fi
 
         # Download the stream
