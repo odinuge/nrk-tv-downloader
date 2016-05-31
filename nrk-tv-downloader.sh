@@ -430,7 +430,7 @@ function program()
         fi
 
         # Download the stream
-        download $stream $localfile
+        download $stream $dl_file
     done
 
 }
