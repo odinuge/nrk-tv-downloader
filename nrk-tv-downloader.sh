@@ -97,7 +97,7 @@ function sec_to_timestamp()
     local sec
     read -r sec
     echo "$sec" \
-        | awk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
+        | gawk '{printf("%02d:%02d:%02d",($1/60/60%24),($1/60%60),($1%60))}'
 }
 
 # Print USAGE
@@ -118,7 +118,7 @@ function usage()
 function getfilesize()
 {
     local file=$1
-    du -h "$file" 2>/dev/null | awk '{print $1}'
+    du -h "$file" 2>/dev/null | gawk '{print $1}'
 }
 
 # Download a stream $1, to a local file $2
@@ -181,7 +181,7 @@ function download()
     local length_sec=$(echo "$probe_info" \
         | grep duration \
         | cut -c 10-\
-        | awk '{print int($1)}')
+        | gawk '{print int($1)}')
     local length_stamp=$(echo "$length_sec" \
         | sec_to_timestamp)
     if $DRY_RUN ; then
@@ -215,7 +215,7 @@ function download()
         fi
         is_newline=false
         local curr_stamp=$(echo "$line"\
-            | awk -F "=" '/time=/{print}' RS=" ")
+            | gawk -F "=" '/time=/{print}' RS=" ")
         if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
             curr_stamp=$(echo "$curr_stamp" | cut -c 6-13)
         else
@@ -225,7 +225,7 @@ function download()
         fi
         curr_s=$(echo "$curr_stamp" \
             | tr ":" " " \
-            | awk '{sec = $1*60*60+$2*60+$3;print sec}')
+            | gawk '{sec = $1*60*60+$2*60+$3;print sec}')
         echo -n -e "\r - Status: $curr_stamp of $length_stamp -"\
             "$(((curr_s*100)/length_sec))%," \
             "$(getfilesize ${localfile})  "
@@ -256,7 +256,7 @@ function parsejson()
         print $2;
     }'
     fnc="${fnc/tag/$tag}"
-    echo "$json" | awk "$fnc"
+    echo "$json" | gawk "$fnc"
 }
 
 # Get an attribute from a html tag
@@ -273,7 +273,7 @@ function gethtmlAttr()
     }'
     fnc=${fnc/hint/$hint}
     fnc=${fnc/attr/$attr}
-    echo "$html" | awk "${fnc}" RS="[<>]"
+    echo "$html" | gawk "${fnc}" RS="[<>]"
 }
 
 # Get the content of a meta tag
@@ -295,7 +295,7 @@ function gethtmlContent()
         print;
         exit;
     }'
-    echo "$html" | awk "${fnc/hint/$hint}" RS="<" ORS=""
+    echo "$html" | gawk "${fnc/hint/$hint}" RS="<" ORS=""
 }
 
 # Get the stream with the best quality
@@ -309,9 +309,9 @@ function getBestStream()
         printf "%s %s\n", bitrate[1], url[1];
     }'
     local new_stream=$(echo "$master_html" \
-        | awk "${fnc}" RS="#EXT-X-STREAM-INF" \
+        | gawk "${fnc}" RS="#EXT-X-STREAM-INF" \
         | sort -n -r \
-        | awk '{print $2;exit}')
+        | gawk '{print $2;exit}')
 
     if [[ "$new_stream" == "index*" ]]; then
         new_stream=${master//master.m3u8/$new_stream}
@@ -372,7 +372,7 @@ function program()
     local streams=$(parsejson "$v8" "url")
     local title=$(parsejson "$v8" "fullTitle")
     local season=$(parsejson "$v8" "relativeOriginUrl" \
-        | awk '/sesong/{printf(" %s", $0)}' RS='/')
+        | gawk '/sesong/{printf(" %s", $0)}' RS='/')
 
     title="$title$season"
     echo "Downloading \"$title\" "
@@ -404,7 +404,7 @@ function program()
     if [[ -z $streams ]]; then
         local message
         message=$(parsejson "$v8" "messageType" \
-            | awk '{gsub("[A-Z]"," &");print tolower($0)}')
+            | gawk '{gsub("[A-Z]"," &");print tolower($0)}')
         echo -e " -$($IS_RADIO && echo Radio || echo Tv) " \
             "program is \e[31mnot available\e[0m:$message\n"
         return
