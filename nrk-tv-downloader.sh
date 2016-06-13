@@ -335,7 +335,7 @@ function getBestStream()
 function program_all()
 {
     local url=$1
-    local season=$2
+    local season=$SEASON
     local html=$(curl $CURL_ "$url")
     local program_id=$(gethtmlAttr "$html" "programid")
 
@@ -444,59 +444,66 @@ function program()
     done
 
 }
-DL_ALL=false
-IS_RADIO=false
-SEASON=false
-NO_CONFIRM=false
-# Main part of script
-OPTIND=1
+function main()
+{
+    DL_ALL=false
+    IS_RADIO=false
+    SEASON=false
+    NO_CONFIRM=false
+    # Main part of script
+    OPTIND=1
 
-while getopts "hasnud" opt; do
-    case "$opt" in
-        h)
-            usage
-            exit 0
-            ;;
-        n)
-            NO_CONFIRM=true
-            ;;
-        d)  DRY_RUN=true
-            ;;
-        a)  DL_ALL=true
-            ;;
-        s)  DL_ALL=true
-            SEASON=true
-            ;;
-    esac
-done
+    while getopts "hasnud" opt; do
+        case "$opt" in
+            h)
+                usage
+                exit 0
+                ;;
+            n)
+                NO_CONFIRM=true
+                ;;
+            d)  DRY_RUN=true
+                ;;
+            a)  DL_ALL=true
+                ;;
+            s)  DL_ALL=true
+                SEASON=true
+                ;;
+        esac
+    done
 
-shift $((OPTIND-1))
+    shift $((OPTIND-1))
 
-[ "$1" = "--" ] && shift
-if [ -z "$1" ]
-then
-    usage
-    exit 1
-fi
+    [ "$1" = "--" ] && shift
+    if [ -z "$1" ]
+    then
+        usage
+        exit 1
+    fi
 
-for var in "$@"
-do
-    case $var in
+    for var in "$@"
+    do
+        case $var in
 
-        *akamaihd.net*)
-            download "$var"
-            ;;
-        *radio.nrk.no*)
-            IS_RADIO=true
-            $DL_ALL && program_all "$var" "$SEASON" || program "$var"
-            ;;
-        *tv.nrk.no*)
-            $DL_ALL && program_all "$var" "$SEASON" || program "$var"
-            ;;
-        *)
-            usage
-            ;;
-    esac
-done
+            *akamaihd.net*)
+                download "$var"
+                ;;
+            *tv.nrk.no*|*radio.nrk.no*|*tv.nrksuper.no*)
+                if [[ "$var" == *radio.nrk.no* ]]; then
+                    IS_RADIO=true
+                fi
+                if $DL_ALL; then
+                    program_all "$var"
+                else
+                    program "$var"
+                fi
+                ;;
+            *)
+                usage
+                ;;
+        esac
+    done
+}
 
+main $@
 # The End!
