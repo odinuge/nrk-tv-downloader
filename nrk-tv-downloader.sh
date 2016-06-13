@@ -121,6 +121,16 @@ function getfilesize()
     du -h "$file" 2>/dev/null | gawk '{print $1}'
 }
 
+# Return tv or radio
+function is_tv_or_radio()
+{
+    if $IS_RADIO; then
+        echo "Radio"
+    else
+        echo "Tv"
+    fi
+}
+
 # Download a stream $1, to a local file $2
 function download()
 {
@@ -175,7 +185,7 @@ function download()
     local probe_info
     probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null)
     if [ $? -ne 0 ]; then
-        echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[31mnot available\e[0m: streamerror\n"
+        echo -e " - $(is_tv_or_radio) program is \e[31mnot available\e[0m: streamerror\n"
         return
     fi
     local length_sec=$(echo "$probe_info" \
@@ -186,12 +196,12 @@ function download()
         | sec_to_timestamp)
     if $DRY_RUN ; then
         echo -e " - Length: $length_stamp"
-        echo -e " -" $($IS_RADIO && echo Radio || echo Tv) "program is \e[01;32mavailable.\e[00m\n"
+        echo -e " - $(is_tv_or_radio) program is \e[01;32mavailable.\e[00m\n"
         return
     fi
 
     local is_newline=true
-    echo -e " - Downloading" $($IS_RADIO && echo radio || echo tv)  "program"
+    echo -e " - Downloading $(is_tv_or_radio) program"
 
     local downloader_params
     if $IS_RADIO; then
@@ -405,8 +415,7 @@ function program()
         local message
         message=$(parsejson "$v8" "messageType" \
             | gawk '{gsub("[A-Z]"," &");print tolower($0)}')
-        echo -e " -$($IS_RADIO && echo Radio || echo Tv) " \
-            "program is \e[31mnot available\e[0m:$message\n"
+        echo -e " - $(is_tv_or_radio) program is \e[31mnot available\e[0m:$message\n"
         return
     fi
 
