@@ -36,7 +36,7 @@ hash "tt-to-subrip" 2> /dev/null
 if [ $? -ne 0 ]; then
     DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
     if [ -f "$DIR/tt-to-subrip/tt-to-subrip.awk" ]; then
-        alias "tt-to-subrip"="$DIR/tt-to-subrip/tt-to-subrip.awk"
+        alias "tt-to-subrip=$DIR/tt-to-subrip/tt-to-subrip.awk"
         readonly SUB_DOWNLOADER=true
     fi
 else
@@ -92,6 +92,22 @@ function timer()
         printf '%d:%02d:%02d' $dh $dm $ds
     fi
 }
+
+# Print in red
+function print_red()
+{
+    # TODO FIXME Check whether term supports colors
+    local input="$1"
+    printf "\e[31m%s\e[0m" "$input"
+}
+
+# Print in green
+function print_green()
+{
+    local input="$1"
+    printf "\e[01;32m%s\e[00m" "$input"
+}
+
 function sec_to_timestamp()
 {
     local sec
@@ -104,7 +120,7 @@ function sec_to_timestamp()
 function usage()
 {
     echo -e "nrk-tv-downloader "
-    echo -e "\nUsage: \e[01;32m$0 <OPTION>... [PROGRAM_URL(s)]...\e[00m"
+    echo -e "\nUsage: $(print_green "$0 <OPTION>... [PROGRAM_URL(s)]...")"
     echo -e "\nOptions:"
     echo -e "\t -a download all episodes, in all seasons."
     echo -e "\t -s download all episodes in season"
@@ -115,7 +131,7 @@ function usage()
 }
 
 # Get the filesize of a file
-function getfilesize()
+function get_filesize()
 {
     local file=$1
     du -h "$file" 2>/dev/null | gawk '{print $1}'
@@ -151,7 +167,8 @@ function download()
     if [ -f "$localfile" ] && ! $DRY_RUN; then
         echo -n " - $localfile exists, overwrite? [y/N]: "
         if $NO_CONFIRM; then
-            echo -e "\n - Skipping program, \e[32malready downloaded\e[00m\n"
+            printf "\n - Skipping program, %s\n" \
+                "$(print_green "already downloaded")"
             return
         fi
         read -r -n 1 ans
@@ -185,7 +202,10 @@ function download()
     local probe_info
     probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null)
     if [ $? -ne 0 ]; then
-        echo -e " - $(is_tv_or_radio) program is \e[31mnot available\e[0m: streamerror\n"
+        printf " - %s program is %s: %s\n\n" \
+            "$(is_tv_or_radio)" \
+            "$(print_red "not available")" \
+            "stremerror"
         return
     fi
     local length_sec=$(echo "$probe_info" \
@@ -196,12 +216,14 @@ function download()
         | sec_to_timestamp)
     if $DRY_RUN ; then
         echo -e " - Length: $length_stamp"
-        echo -e " - $(is_tv_or_radio) program is \e[01;32mavailable.\e[00m\n"
+        printf " - %s program is %s\n" \
+            "$(is_tv_or_radio)" \
+            "$(print_green "available")"
         return
     fi
 
     local is_newline=true
-    echo -e " - Downloading $(is_tv_or_radio) program"
+    printf " - Downloading %s program\n" "$(is_tv_or_radio)"
 
     local downloader_params
     if $IS_RADIO; then
@@ -215,17 +237,21 @@ function download()
         line=$(echo "$line" | tr '\r' '\n')
         if [[ $line =~ Returncode[1-9] ]]; then
             $is_newline || echo && is_newline=true
-            echo -e " - \e[31mError\e[0m downloading program.\n"
+            printf " - %s downloading program.\n\n" \
+                "$(print_red "Error")"
             rm "$localfile" 2>/dev/null
             return
         elif [[ "$line" != *bitrate* ]]; then
             $is_newline || echo && is_newline=true
-            echo -e " - \e[31m${DOWNLOADER_BIN} error:\e[0m $line"
+            printf " - %s %s" \
+                "$(print_red "${DOWNLOADER_BIN} error")" \
+                "$line"
+
             continue
         fi
         is_newline=false
-        local curr_stamp=$(echo "$line"\
-            | gawk -F "=" '/time=/{print}' RS=" ")
+        local curr_stamp="$(echo "$line"\
+            | gawk -F "=" '/time=/{print}' RS=" ")"
         if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
             curr_stamp=$(echo "$curr_stamp" | cut -c 6-13)
         else
@@ -236,19 +262,22 @@ function download()
         curr_s=$(echo "$curr_stamp" \
             | tr ":" " " \
             | gawk '{sec = $1*60*60+$2*60+$3;print sec}')
-        echo -n -e "\r - Status: $curr_stamp of $length_stamp -"\
-            "$(((curr_s*100)/length_sec))%," \
-            "$(getfilesize ${localfile})  "
+        printf "\r - Status: %s of %s - %s%%, %s  " \
+            "$curr_stamp" \
+            "$length_stamp" \
+            "$(((curr_s*100)/length_sec))" \
+            "$(get_filesize ${localfile})  "
     done < <($DOWNLOADER_BIN -i "$stream" \
         $downloader_params \
-        -y $localfile 2>&1 \
+        -y "$localfile" 2>&1 \
         || echo -e "\rReturncode$?\r"
     )
-    echo -e "\r - Status: $length_stamp of $length_stamp - " \
-        "100%, " \
-        "$(getfilesize $localfile)"
-    echo -e " - Download complete"
-    printf ' - Elapsed time: %s\n\n' "$(timer $t)"
+    printf "\r - Status: %s of %s - 100%%, %s   \n" \
+        "$length_stamp" \
+        "$length_stamp" \
+        "$(get_filesize "$localfile")"
+    printf " - Download complete\n"
+    printf ' - Elapsed time: %s\n\n' "$(timer "$t")"
 }
 
 # Get json value from v8
@@ -358,7 +387,7 @@ function program_all()
         if [ "$season" = "extra" ]; then
             season_name="extramaterial"
         fi
-        echo -e "Downloading \"$season_name\""
+        printf "Downloading \"%s\"\n" "$season_name"
         # loop through all the episodes
         for episode in $episodes ; do
             program "https://tv.nrk.no/serie/$series_name/$episode"
@@ -385,15 +414,26 @@ function program()
         | gawk '/sesong/{printf(" %s", $0)}' RS='/')
 
     title="$title$season"
-    echo "Downloading \"$title\" "
+    printf "Downloading \"%s\"\n" "$title"
 
     # TODO FIXME Fix the name of the file
     local localfile="$title"
     localfile="${localfile// /_}"
-    localfile="${localfile//&#230;/ae}"
+    localfile="${localfile//&\#230;/ae}"
     localfile="${localfile//ø/o}"
     localfile="${localfile//å/aa}"
     localfile="${localfile//:/-}"
+
+    if [[ -z $streams ]]; then
+        local message
+        message=$(parsejson "$v8" "messageType" \
+            | gawk '{gsub("[A-Z]"," &");print tolower($0)}')
+        printf " - %s program is %s: %s\n\n" \
+            "$(is_tv_or_radio)" \
+            "$(print_red "not available")" \
+            "$message"
+        return
+    fi
 
     # Check if program has a valid subtitle
     local subtitle
@@ -405,18 +445,12 @@ function program()
             | tt-to-subrip > "$localfile.srt"
     elif $SUB_DOWNLOADER && ! $IS_RADIO; then
         if [ "$subtitle" == "true" ] ; then
-            echo " - Subtitle is available"
+            printf " - Subtitle is %s\n" \
+                "$(print_green "available")"
         else
-            echo " - Subtitle is not available"
+            printf " - Subtitle is %s\n" \
+                "$(print_red "not available")"
         fi
-    fi
-
-    if [[ -z $streams ]]; then
-        local message
-        message=$(parsejson "$v8" "messageType" \
-            | gawk '{gsub("[A-Z]"," &");print tolower($0)}')
-        echo -e " - $(is_tv_or_radio) program is \e[31mnot available\e[0m:$message\n"
-        return
     fi
 
     local num_streams
