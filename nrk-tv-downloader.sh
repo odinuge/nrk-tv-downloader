@@ -50,6 +50,7 @@ readonly DOWNLOADERS="ffmpeg avconv"
 for downloader in $DOWNLOADERS; do
     if hash "$downloader" 2>/dev/null; then
         readonly DOWNLOADER_BIN=$downloader
+        break
     fi
 done
 
@@ -63,6 +64,7 @@ readonly PROBES="ffprobe avprobe"
 for probe in $PROBES; do
     if hash "$probe" 2>/dev/null; then
         readonly PROBE_BIN=$probe
+        break
     fi
 
 done
