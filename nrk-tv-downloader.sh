@@ -424,7 +424,7 @@ function program()
     localfile="${localfile//å/aa}"
     localfile="${localfile//:/-}"
 
-    if [[ -z $streams ]]; then
+    if [[ -z $streams || ! "$streams" == *"http"* ]]; then
         local message
         message=$(parsejson "$v8" "messageType" \
             | gawk '{gsub("[A-Z]"," &");print tolower($0)}')
