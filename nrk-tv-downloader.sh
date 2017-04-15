@@ -401,6 +401,27 @@ function program_all()
     done
 }
 
+function embedded_video()
+{
+    local url=$1
+    local season=$SEASON
+    local html=$(curl $CURL_ "$url")
+
+    local episodes=$(gethtmlAttr "$html" "class=\"nrk-video\"" "data-nrk-id")
+
+    if [[ -z $episodes ]]; then
+      echo "Found no video streams in the given url..."
+      return
+    fi
+    echo "Downloading video streams from given url"
+    for episode in $episodes ; do
+      printf "Downloading \"%s\"\n" "$episode"
+      local stream="https://nordond17b-f.akamaihd.net/i/nordics/open/skam/${episode}_,205,380,659,1394,2410,.mp4.csmil/master.m3u8"
+      download "$stream" "${episode}.mp4"
+
+    done
+}
+
 # Download program from url $1, to a local file $2 (if provided)
 function program()
 {
@@ -525,10 +546,6 @@ function main()
     for var in "$@"
     do
         case $var in
-
-            *akamaihd.net*)
-                download "$var"
-                ;;
             *tv.nrk.no*|*radio.nrk.no*|*tv.nrksuper.no*)
                 if [[ "$var" == *radio.nrk.no* ]]; then
                     IS_RADIO=true
@@ -539,6 +556,9 @@ function main()
                     program "$var"
                 fi
                 ;;
+            *nrk.no*|*p3.no*)
+              embedded_video "$var"
+              ;;
             *)
                 usage
                 exit 1

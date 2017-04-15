@@ -43,6 +43,7 @@ For updates see <https://github.com/odinuge/nrk-tv-downloader>
 
 Example:
 $ ./nrk-tv-downloader.sh -s "https://tv.nrk.no/serie/skam/MYNT15000116/sesong-2/episode-1"
+$ ./nrk-tv-downloader.sh "http://skam.p3.no/"
 ```
 
 ## Requirements
