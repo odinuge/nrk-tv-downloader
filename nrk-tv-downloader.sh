@@ -377,8 +377,9 @@ function program_all()
     if $season ; then
         seasons=$(gethtmlAttr "$html" "seasonid")
     fi
-    series_name=$(gethtmlMeta "$html" "seriesid")
-
+    local series_name=$(gethtmlMeta "$html" 'og:url' \
+        | grep -o -P "/serie/\K[^/]+"
+    )
     # Loop through all seasons, or just the selected one
     for season in $seasons ; do
         local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
