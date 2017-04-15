@@ -12,7 +12,7 @@ DEPS="sed awk gawk printf curl cut grep rev"
 DRY_RUN=false
 
 # Curl flags (for making it silent)
-readonly CURL_="-s"
+readonly CURL_="-s -L"
 
 # Check the shell
 if [ -z "$BASH_VERSION" ]; then
@@ -323,6 +323,7 @@ function gethtmlMeta()
     local html=$1
     local name=$2
     gethtmlAttr "$html" "meta name=\"$name\"" "content"
+    gethtmlAttr "$html" "meta property=\"$name\"" "content"
 }
 
 # Get the content inside a html-Tag
@@ -368,7 +369,9 @@ function program_all()
     local url=$1
     local season=$SEASON
     local html=$(curl $CURL_ "$url")
-    local program_id=$(gethtmlAttr "$html" "programid")
+    local program_id=$(gethtmlMeta "$html" 'og:url' \
+        | grep -o -P "([A-Z]{4}[0-9]{8})"
+    )
 
     local seasons=$(gethtmlAttr "$html" "data-season" "data-season")
     if $season ; then
@@ -404,7 +407,9 @@ function program()
     local url="$1"
 
     local html=$(curl $CURL_ -L "$url")
-    local program_id=$(gethtmlMeta "$html" "programid")
+    local program_id=$(gethtmlMeta "$html" 'og:url' \
+        | grep -o -P "([A-Z]{4}[0-9]{8})"
+    )
 
     # Fetch the info with the v8-API
     local v8=$(curl $CURL_ \
