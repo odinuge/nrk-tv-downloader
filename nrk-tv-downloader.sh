@@ -396,7 +396,7 @@ function program_all()
     fi
 
     if ! $ONLY_CURRENT ; then
-        printf "Available seasons of \"%s\": %s\n" \
+        printf 'Available seasons of "%s": %s\n' \
           "$series_name" \
           "$(echo $seasons | wc -w)"
     fi
@@ -407,13 +407,22 @@ function program_all()
             url="https://tv.nrk.no/extramaterial/$series_name"
         fi
         local s_html=$(curl $CURL_ "$url")
-        local episodes=$(gethtmlAttr "$s_html" "data-episode" "data-episode")
+
+        # Find only episodes with program-rights
+        # will match lines in awk like `/episode-item/ && !/no-rights/ {}`
+        local episodes=$(gethtmlAttr "$s_html" "episode-item/ && !/no-rights" "data-episode")
         local season_name=$(gethtmlContent "$s_html" "h1>")
 
         if [ "$season" = "extra" ]; then
             season_name="extramaterial"
         fi
-        printf "Downloading \"%s\"\n" "$season_name"
+        printf 'Available episodes in "%s": %s\n' \
+            "$season_name" \
+            "$(echo $episodes | wc -w)"
+
+        if $DRY_RUN ; then
+            continue
+        fi
         # loop through all the episodes
         for episode in $episodes ; do
             program "https://tv.nrk.no/serie/$series_name/$episode"
@@ -428,7 +437,7 @@ function embedded_video()
     local season=$SEASON
     local html=$(curl $CURL_ "$url")
 
-    local episodes=$(gethtmlAttr "$html" "class=\"nrk-video\"" "data-nrk-id")
+    local episodes=$(gethtmlAttr "$html" 'class="nrk-video\"' "data-nrk-id")
 
     if [[ -z $episodes ]]; then
       echo "Found no video streams in the given url..."
@@ -463,7 +472,7 @@ function program()
         | gawk '/sesong/{printf(" %s", $0)}' RS='/')
 
     title="$title$season"
-    printf "Downloading \"%s\"\n" "$title"
+    printf 'Program "%s"\n' "$title"
 
     # TODO FIXME Fix the name of the file
     local localfile="$title"
@@ -578,8 +587,8 @@ function main()
                 fi
                 ;;
             *nrk.no*|*p3.no*)
-              embedded_video "$var"
-              ;;
+                embedded_video "$var"
+                ;;
             *)
                 usage
                 exit 1
