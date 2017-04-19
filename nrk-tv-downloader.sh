@@ -370,7 +370,7 @@ function program_all()
     local season=$SEASON
     local html=$(curl $CURL_ "$url")
     local program_id=$(gethtmlMeta "$html" 'og:url' \
-        | grep -o -P "([A-Z]{4}[0-9]{8})"
+        | sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
     )
 
     local seasons=$(gethtmlAttr "$html" "data-season" "data-season")
@@ -378,8 +378,9 @@ function program_all()
         seasons=$(gethtmlAttr "$html" "seasonid")
     fi
     local series_name=$(gethtmlMeta "$html" 'og:url' \
-        | grep -o -P "/serie/\K[^/]+"
+        | sed -E 's/.*serie\/([a-zA-Z0-9]*)\/.*/\1/'
     )
+
     # Loop through all seasons, or just the selected one
     for season in $seasons ; do
         local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
@@ -430,7 +431,7 @@ function program()
 
     local html=$(curl $CURL_ -L "$url")
     local program_id=$(gethtmlMeta "$html" 'og:url' \
-        | grep -o -P "([A-Z]{4}[0-9]{8})"
+        | sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
     )
 
     # Fetch the info with the v8-API
