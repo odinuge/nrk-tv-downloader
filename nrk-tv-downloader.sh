@@ -378,7 +378,7 @@ function program_all()
         seasons=$(gethtmlAttr "$html" "seasonid")
     fi
     local series_name=$(gethtmlMeta "$html" 'og:url' \
-        | sed -E 's/.*serie\/([a-zA-Z0-9]*)\/.*/\1/'
+        | sed -E 's/.*serie\/([^/]*).*/\1/'
     )
 
     # Loop through all seasons, or just the selected one
