@@ -367,20 +367,39 @@ function getBestStream()
 function program_all()
 {
     local url=$1
-    local season=$SEASON
+    local ONLY_CURRENT=$SEASON
     local html=$(curl $CURL_ "$url")
     local program_id=$(gethtmlMeta "$html" 'og:url' \
         | sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
     )
-
-    local seasons=$(gethtmlAttr "$html" "data-season" "data-season")
-    if $season ; then
-        seasons=$(gethtmlAttr "$html" "seasonid")
-    fi
     local series_name=$(gethtmlMeta "$html" 'og:url' \
         | sed -E 's/.*serie\/([^/]+).*/\1/'
     )
+    if $ONLY_CURRENT ; then
+        seasons=$(gethtmlMeta "$html" 'seasonid')
+        if [[ -z $seasons ]]; then
+          seasons=$(gethtmlAttr "$html" "seasontabs" "data-module-settings" \
+              |  sed -E "s/.*([0-9]{5}).*/\1/"
+          )
+        fi
+    else
+        seasons=$(gethtmlAttr "$html" "data-season" "data-season")
+        if [[ -z $seasons ]]; then
+          seasons=$(gethtmlAttr "$html" "season-episodes" "id" \
+              |  sed -E "s/.*([0-9]{5}).*/\1/"
+          )
+        fi
+    fi
+    if [[ -z $seasons ]]; then
+      printf "Unable to download. Found no seasons."
+      exit 1
+    fi
 
+    if ! $ONLY_CURRENT ; then
+        printf "Available seasons of \"%s\": %s\n" \
+          "$series_name" \
+          "$(echo $seasons | wc -w)"
+    fi
     # Loop through all seasons, or just the selected one
     for season in $seasons ; do
         local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
