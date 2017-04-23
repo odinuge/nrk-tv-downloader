@@ -91,9 +91,10 @@ function timer()
         ds=$((dt % 60))
         dm=$(((dt / 60) % 60))
         dh=$((dt / 3600))
-        printf '%d:%02d:%02d' $dh $dm $ds
+        printf '%02d:%02d:%02d' $dh $dm $ds
     fi
 }
+
 
 # Print in red
 function print_red()
@@ -136,7 +137,7 @@ function usage()
 function get_filesize()
 {
     local file=$1
-    du -h "$file" 2>/dev/null | gawk '{print $1}'
+    du -h "$file" 2>/dev/null | gawk '{print $1B}'
 }
 
 # Return tv or radio
@@ -147,6 +148,17 @@ function is_tv_or_radio()
     else
         echo "Tv"
     fi
+}
+
+# Get a more human readable representation of $1 seconds
+function sec_to_human_readable {
+  local INPUT_S=$1
+  local H=$((INPUT_S/60/60))
+  local M=$((INPUT_S/60%60))
+  local S=$((INPUT_S%60))
+  (( $H > 0 )) && printf '%d hours ' $H
+  (( $M > 0 )) && printf '%d minutes ' $M && return
+  printf '%d seconds' $S
 }
 
 # Download a stream $1, to a local file $2
@@ -169,7 +181,7 @@ function download()
     if [ -f "$localfile" ] && ! $DRY_RUN; then
         echo -n " - $localfile exists, overwrite? [y/N]: "
         if $NO_CONFIRM; then
-            printf "\n - Skipping program, %s\n" \
+            printf "\n - Skipping program, %s\n\n" \
                 "$(print_green "already downloaded")"
             return
         fi
@@ -225,8 +237,6 @@ function download()
     fi
 
     local is_newline=true
-    printf " - Downloading %s program\n" "$(is_tv_or_radio)"
-
     local downloader_params
     if $IS_RADIO; then
         downloader_params="-codec:a libmp3lame -qscale:a 2 -loglevel info"
@@ -243,7 +253,7 @@ function download()
                 "$(print_red "Error")"
             rm "$localfile" 2>/dev/null
             return
-        elif [[ "$line" != *bitrate* ]]; then
+        elif [[ $line != *bitrate\=* || $line != *speed\=* ]]; then
             $is_newline || echo && is_newline=true
             printf " - %s %s" \
                 "$(print_red "${DOWNLOADER_BIN} error")" \
@@ -252,6 +262,23 @@ function download()
             continue
         fi
         is_newline=false
+
+        # Bitrate of source in Kbit/s
+        local bitrate="$(echo "$line" \
+            | gawk '/bitrate=/{print}' \
+            | sed -E 's/^.*bitrate= *([0-9]+).*$/\1/g' \
+        )"
+
+        # Speed relative to video "speed"
+        # Eg. speed=5 -> 5x -> 5 times faster downloading
+        # than the speed of the video
+        local speed="$(echo "$line" \
+            | gawk '/speed=/{print}' \
+            | sed -E 's/^.*speed= *([0-9.]+).+$/\1/' \
+        )"
+
+        # Downloadspeed in Mbit/s
+        local dl_speed=$(echo "$bitrate $speed" | awk '{printf("%.1f", $1*$2/1024)}')
         local curr_stamp="$(echo "$line"\
             | gawk -F "=" '/time=/{print}' RS=" ")"
         if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
@@ -264,21 +291,34 @@ function download()
         curr_s=$(echo "$curr_stamp" \
             | tr ":" " " \
             | gawk '{sec = $1*60*60+$2*60+$3;print sec}')
-        printf "\r - Status: %s of %s - %s%%, %s  " \
+
+        # Percent of total download - 0% -> 100%
+        local percent_dl="$(((curr_s*100)/length_sec))"
+
+        # Download ETA, estimated with the remaining time, and the dl speed
+        local eta=$(echo "$length_sec $curr_s $speed"|awk '{printf("%.0f", ($1-$2)/$3)}')
+
+        printf '\r - Status: %s of %s - %s%%, %.1fMbit/s - ETA: %s   ' \
             "$curr_stamp" \
             "$length_stamp" \
-            "$(((curr_s*100)/length_sec))" \
-            "$(get_filesize ${localfile})  "
+            "$percent_dl" \
+            "$dl_speed" \
+            "$(sec_to_human_readable $eta)"
+
     done < <($DOWNLOADER_BIN -i "$stream" \
         $downloader_params \
         -y "$localfile" 2>&1 \
         || echo -e "\rReturncode$?\r"
     )
-    printf "\r - Status: %s of %s - 100%%, %s   \n" \
-        "$length_stamp" \
-        "$length_stamp" \
-        "$(get_filesize "$localfile")"
+    printf '\r - Status: %s of %s - %s%%, %.1fMbit/s - ETA: %s   \n' \
+            "$length_stamp" \
+            "$length_stamp" \
+            "100" \
+            "$dl_speed" \
+            "$(sec_to_human_readable 0)"
+
     printf " - Download complete\n"
+    printf " - Filesize: %sB\n" "$(get_filesize "$localfile")"
     printf ' - Elapsed time: %s\n\n' "$(timer "$t")"
 }
 
