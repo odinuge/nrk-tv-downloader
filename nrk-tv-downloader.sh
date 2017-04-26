@@ -332,7 +332,7 @@ function parsejson()
         RS="{\"|,\"";
         FS="\":";
     }
-    /tag/{
+    /tag\"\:/{
         gsub("\"","",$2);
         print $2;
     }'
