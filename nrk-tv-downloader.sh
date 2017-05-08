@@ -10,6 +10,7 @@ shopt -s expand_aliases
 
 DEPS="sed awk gawk printf curl cut grep rev"
 DRY_RUN=false
+DOWNLOAD_SUBS=true
 
 # Curl flags (for making it silent)
 readonly CURL_="-s -L"
@@ -129,6 +130,7 @@ function usage()
     echo -e "\t -s download all episodes in season"
     echo -e "\t -n skip files that exists"
     echo -e "\t -d dry run - list what is possible to download"
+    echo -e "\t -u do not download subtitles"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
 }
@@ -533,22 +535,24 @@ function program()
         return
     fi
 
-    # Check if program has a valid subtitle
-    local subtitle
-    subtitle=$(parsejson "$v8" "hasSubtitles")
+    # Check if program has a valid subtitle (if downloading subs enabled)
+    if $DOWNLOAD_SUBS ; then
+      local subtitle
+      subtitle=$(parsejson "$v8" "hasSubtitles")
 
-    if [ "$subtitle" == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
-        echo " - Downloading subtitle"
-        curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
-            | tt-to-subrip > "$localfile.srt"
-    elif $SUB_DOWNLOADER && ! $IS_RADIO; then
-        if [ "$subtitle" == "true" ] ; then
-            printf " - Subtitle is %s\n" \
-                "$(print_green "available")"
-        else
-            printf " - Subtitle is %s\n" \
-                "$(print_red "not available")"
-        fi
+      if [ "$subtitle" == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN ; then
+          echo " - Downloading subtitle"
+          curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" \
+              | tt-to-subrip > "$localfile.srt"
+      elif $SUB_DOWNLOADER && ! $IS_RADIO; then
+          if [ "$subtitle" == "true" ] ; then
+              printf " - Subtitle is %s\n" \
+                  "$(print_green "available")"
+          else
+              printf " - Subtitle is %s\n" \
+                  "$(print_red "not available")"
+          fi
+      fi
     fi
 
     local num_streams
@@ -595,6 +599,8 @@ function main()
                 NO_CONFIRM=true
                 ;;
             d)  DRY_RUN=true
+                ;;
+            u)  DOWNLOAD_SUBS=false
                 ;;
             a)  DL_ALL=true
                 ;;
