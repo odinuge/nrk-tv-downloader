@@ -36,6 +36,7 @@ Options:
      -s download all episodes in season
      -n skip files that exists
      -d dry run - list what is possible to download
+     -u do not download subtitles
      -h print this
 
 
