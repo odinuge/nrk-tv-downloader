@@ -11,6 +11,7 @@ shopt -s expand_aliases
 DEPS="sed awk gawk printf curl cut grep rev"
 DRY_RUN=false
 DOWNLOAD_SUBS=true
+EPISODE_FORMAT=false
 
 # Curl flags (for making it silent)
 readonly CURL_="-s -L"
@@ -131,6 +132,7 @@ function usage()
     echo -e "\t -n skip files that exists"
     echo -e "\t -d dry run - list what is possible to download"
     echo -e "\t -u do not download subtitles"
+    echo -e "\t -e episode mode - format episodes as Program.name.SXXEXX.mp4"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
 }
@@ -405,6 +407,17 @@ function getBestStream()
 
 }
 
+#Add a "0" before the numbers 1-9
+function prefix_number()
+{
+  local number=$1
+  if [ $number -lt 10 ] ; then
+    echo "0$number"
+  else
+    echo "$number"
+  fi
+}
+
 # Download all the episodes!
 function program_all()
 {
@@ -509,11 +522,40 @@ function program()
         "http://v8.psapi.nrk.no/mediaelement/${program_id}")
 
     local streams=$(parsejson "$v8" "url")
-    local title=$(parsejson "$v8" "fullTitle")
-    local season=$(parsejson "$v8" "relativeOriginUrl" \
-        | gawk '/sesong/{printf(" %s", $0)}' RS='/')
+    local title=""
 
-    title="$title$season"
+    # Figure out title and local filename format
+    if $EPISODE_FORMAT && [ $(parsejson "$v8" "mediaElementType") == "Episode" ] ; then
+      # Episode format enabled and available
+      title=$(parsejson "$v8" "seriesTitle")
+      title=${title// /.}
+      local ep_num_or_date=$(parsejson "$v8" "episodeNumberOrDate")
+      local season_ep_format=""
+
+      if [[ $ep_num_or_date == *":"* ]]; then #season epsiode format
+        local season_prefix="sesong-"
+        local arr_episode_format=(${ep_num_or_date//:/ })
+        local season=$(parsejson "$v8" "relativeOriginUrl" \
+            | gawk '/sesong/{printf("%s", $0)}' RS='/')
+
+        season=${season#$season_prefix}
+        season="$(prefix_number "$season")"
+        episode="$(prefix_number "${arr_episode_format[0]}")"
+        season_ep_format="S${season}E${episode}"
+      else
+        season_ep_format=episodeNumberOrDate # date format
+      fi
+
+      title="$title.$season_ep_format"
+      
+    else
+      # Standard format
+      title=$(parsejson "$v8" "fullTitle")
+      local season=$(parsejson "$v8" "relativeOriginUrl" \
+          | gawk '/sesong/{printf(" %s", $0)}' RS='/')
+      title="$title$season"
+    fi
+
     printf 'Program "%s"\n' "$title"
 
     # TODO FIXME Fix the name of the file
@@ -589,7 +631,7 @@ function main()
     # Main part of script
     OPTIND=1
 
-    while getopts "hasnud" opt; do
+    while getopts "hasnude" opt; do
         case "$opt" in
             h)
                 usage
@@ -601,6 +643,8 @@ function main()
             d)  DRY_RUN=true
                 ;;
             u)  DOWNLOAD_SUBS=false
+                ;;
+            e)  EPISODE_FORMAT=true
                 ;;
             a)  DL_ALL=true
                 ;;
