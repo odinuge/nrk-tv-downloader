@@ -37,6 +37,7 @@ Options:
      -n skip files that exists
      -d dry run - list what is possible to download
      -u do not download subtitles
+     -e episode mode - format episodes as Series.name.SXXEXX.mp4
      -h print this
 
 

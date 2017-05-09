@@ -132,7 +132,7 @@ function usage()
     echo -e "\t -n skip files that exists"
     echo -e "\t -d dry run - list what is possible to download"
     echo -e "\t -u do not download subtitles"
-    echo -e "\t -e episode mode - format episodes as Program.name.SXXEXX.mp4"
+    echo -e "\t -e episode mode - format episodes as Series.name.SXXEXX.mp4"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
 }
@@ -547,7 +547,7 @@ function program()
       fi
 
       title="$title.$season_ep_format"
-      
+
     else
       # Standard format
       title=$(parsejson "$v8" "fullTitle")
