@@ -411,17 +411,6 @@ function getBestStream()
 
 }
 
-#Add a "0" before the numbers 1-9
-function prefix_number()
-{
-  local number=$1
-  if [ $number -lt 10 ] ; then
-    echo "0$number"
-  else
-    echo "$number"
-  fi
-}
-
 # Download all the episodes!
 function program_all()
 {
@@ -527,15 +516,16 @@ function program()
 
     local streams=$(parsejson "$v8" "url")
 
+    local title=$(parsejson "$v8" "fullTitle")
+    local series_title=$(parsejson "$v8" "seriesTitle")
+
     local localfile=""
-    local title=""
     local season=""
     local episode=""
 
     # Figure out title and local filename format
     if $EPISODE_FORMAT && [ $(parsejson "$v8" "mediaElementType") == "Episode" ] ; then
       # Episode format enabled and available
-      title=$(parsejson "$v8" "seriesTitle")
 
       local ep_num_or_date=$(parsejson "$v8" "episodeNumberOrDate")
       local season_ep_format=""
@@ -546,19 +536,17 @@ function program()
         season=$(parsejson "$v8" "relativeOriginUrl" \
             | gawk '/sesong/{printf("%s", $0)}' RS='/')
 
-        season=${season#$season_prefix}
-        season="$(prefix_number "$season")"
-        episode="$(prefix_number "${arr_episode_format[0]}")"
+        season=$(printf "%02d" ${season#$season_prefix})
+        episode="$(printf "%02d" "${arr_episode_format[0]}")"
         season_ep_format="S${season}E${episode}"
       else
         season_ep_format=episodeNumberOrDate # date format
       fi
 
-      localfile="$title.$season_ep_format"
+      localfile="$series_title.$season_ep_format"
       localfile="${localfile// /.}"
     else
       # Standard format
-      title=$(parsejson "$v8" "fullTitle")
       season=$(parsejson "$v8" "relativeOriginUrl" \
           | gawk '/sesong/{printf(" %s", $0)}' RS='/')
       localfile="$title$season"
@@ -583,9 +571,9 @@ function program()
     mkdir -p "$localfolder" # create if not exists
 
     if $EPISODE_FORMAT && $EPISODE_FOLDERS && [ $(parsejson "$v8" "mediaElementType") == "Episode" ] ; then
-      local series_folder="$localfolder$title"
+      local series_folder="${localfolder}${series_title}"
       mkdir -p "$series_folder"
-      series_folder="$series_folder/Season $season"
+      series_folder="${series_folder}/Season ${season}"
       mkdir -p "$series_folder"
       localfolder="$series_folder/"
     fi
