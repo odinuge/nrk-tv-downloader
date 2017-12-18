@@ -13,6 +13,7 @@ DRY_RUN=false
 DOWNLOAD_SUBS=true
 EPISODE_FORMAT=false
 EPISODE_FOLDERS=false
+SELECT_QUALITY=false
 TARGET_PATH="." # default to current folder unless specified
 
 # Curl flags (for making it silent)
@@ -136,6 +137,7 @@ function usage()
     echo -e "\t -u do not download subtitles"
     echo -e "\t -e episode mode - format episodes as Series.name.SXXEXX.mp4"
     echo -e "\t -f create series and season number folders for episodes (use together with -e)"
+    echo -e "\t -q will ask you to select quality"
     echo -e "\t -t target directory for downloaded files (e.g. /mnt/media/TV)"
     echo -e "\t -h print this\n"
     echo -e "\nFor updates see <https://github.com/odinuge/nrk-tv-downloader>"
@@ -395,20 +397,30 @@ function getBestStream()
     local master_html=$(curl $CURL_ "$master")
     local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
-        match($0, /(http.*$|index.*$)/,url);
-        printf "%s %s\n", bitrate[1], url[1];
+        match($0, /(http.*$|index.*[^\n])/, url);
+        match($0, /RESOLUTION=([0-9]+x[0-9]+)/, resolution);
+        printf "%s %s %s\n", bitrate[1], url[1], resolution[1];
     }'
-    local new_stream=$(echo "$master_html" \
+
+    local sorted_streams=$(echo "$master_html" \
         | gawk "${fnc}" RS="#EXT-X-STREAM-INF" \
-        | sort -n -r \
-        | gawk '{print $2;exit}')
+        | sort -n -r )
 
-    if [[ "$new_stream" == "index*" ]]; then
-        new_stream=${master//master.m3u8/$new_stream}
+    local ans=0
+    if $SELECT_QUALITY ; then
+        # TODO FIXME Using stderr to don't interfer with "return" value
+        local versions=$(echo "$sorted_streams" \
+            | gawk '{printf "[%s] Resulution: %s, Bitrate: %sKbit/s\n", NR-1, $3, $1/1024}')
+        (>&2 echo "$versions")
+        (>&2 echo -n "Choose a version by entering the corresponding number: ")
+
+        read -r -n 1 ans
+        (>&2 echo)
     fi
+    new_stream=$(echo "$sorted_streams" \
+            | gawk "NR - 1 == ${ans} {print \$2; exit}")
 
-    echo "$stream"
-
+    echo ${master//master.m3u8/$new_stream}
 }
 
 # Download all the episodes!
@@ -475,27 +487,6 @@ function program_all()
         for episode in $episodes ; do
             program "https://tv.nrk.no/serie/$series_name/$episode"
         done
-
-    done
-}
-
-function embedded_video()
-{
-    local url=$1
-    local season=$SEASON
-    local html=$(curl $CURL_ "$url")
-
-    local episodes=$(gethtmlAttr "$html" 'class="nrk-video\"' "data-nrk-id")
-
-    if [[ -z $episodes ]]; then
-      echo "Found no video streams in the given url..."
-      return
-    fi
-    echo "Downloading video streams from given url"
-    for episode in $episodes ; do
-      printf "Downloading \"%s\"\n" "$episode"
-      local stream="https://nordond17b-f.akamaihd.net/i/nordics/open/skam/${episode}_,205,380,659,1394,2410,.mp4.csmil/master.m3u8"
-      download "$stream" "${episode}.mp4"
 
     done
 }
@@ -639,7 +630,7 @@ function main()
     # Main part of script
     OPTIND=1
 
-    while getopts "hasnudeft:" opt; do
+    while getopts "hasnudefqt:" opt; do
         case "$opt" in
             h)
                 usage
@@ -655,6 +646,8 @@ function main()
             e)  EPISODE_FORMAT=true
                 ;;
             f)  EPISODE_FOLDERS=true
+                ;;
+            q)  SELECT_QUALITY=true
                 ;;
             t)  if [ -z "$OPTARG" ] ; then
                   usage
@@ -692,9 +685,6 @@ function main()
                 else
                     program "$var"
                 fi
-                ;;
-            *nrk.no*|*p3.no*)
-                embedded_video "$var"
                 ;;
             *)
                 ;;

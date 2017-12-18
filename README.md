@@ -39,6 +39,7 @@ Options:
      -u do not download subtitles
      -e episode mode - format episodes as Series.name.SXXEXX.mp4
      -f create series and season number folders for episodes (use together with -e)
+     -q will ask you to select quality
      -t target directory for downloaded files (e.g. /mnt/media/TV - no trailing slash)
      -h print this
 
