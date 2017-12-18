@@ -37,6 +37,9 @@ Options:
      -n skip files that exists
      -d dry run - list what is possible to download
      -u do not download subtitles
+     -e episode mode - format episodes as Series.name.SXXEXX.mp4
+     -f create series and season number folders for episodes (use together with -e)
+     -t target directory for downloaded files (e.g. /mnt/media/TV - no trailing slash)
      -h print this
 
 
