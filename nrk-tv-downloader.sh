@@ -308,7 +308,7 @@ function download()
         # Download ETA, estimated with the remaining time, and the dl speed
         local eta=$(echo "$length_sec $curr_s $speed"|awk '{printf("%.0f", ($1-$2)/$3)}')
 
-        printf '\r - Status: %s of %s - %s%%, %.1fMbit/s - ETA: %s   ' \
+        printf '\r - Status: %s of %s - %s%%, %s Mbit/s - ETA: %s   ' \
             "$curr_stamp" \
             "$length_stamp" \
             "$percent_dl" \
@@ -320,7 +320,7 @@ function download()
         -y "$localfile" 2>&1 \
         || echo -e "\rReturncode$?\r"
     )
-    printf '\r - Status: %s of %s - %s%%, %.1fMbit/s - ETA: %s   \n' \
+    printf '\r - Status: %s of %s - %s%%, %s Mbit/s - ETA: %s   \n' \
             "$length_stamp" \
             "$length_stamp" \
             "100" \
