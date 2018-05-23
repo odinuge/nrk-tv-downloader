@@ -505,6 +505,16 @@ function program()
     local program_id=$(gethtmlMeta "$html" 'og:url' \
         | sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
     )
+    if [ -z "$program_id" ]; then
+        # Super uses another format
+        program_id=$(
+            gethtmlAttr \
+                    "$html" \
+                    "data-ludo-media-id" \
+                    "data-ludo-media-id"
+            )
+
+    fi
 
     # Fetch the info with the v8-API
     local v8=$(curl $CURL_ \
