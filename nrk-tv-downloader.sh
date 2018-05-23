@@ -420,7 +420,12 @@ function getBestStream()
     new_stream=$(echo "$sorted_streams" \
             | gawk "NR - 1 == ${ans} {print \$2; exit}")
 
-    echo ${master//master.m3u8/$new_stream}
+    # Some links are absolute, and some links are relative
+    if [[ "$new_stream" == "http"* ]]; then
+        echo $new_stream
+    else
+        echo ${master//master.m3u8/"$new_stream"}
+    fi
 }
 
 # Download all the episodes!
