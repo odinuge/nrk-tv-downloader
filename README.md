@@ -51,6 +51,13 @@ $ ./nrk-tv-downloader.sh -s "https://tv.nrk.no/serie/skam/MYNT15000116/sesong-2/
 $ ./nrk-tv-downloader.sh "http://skam.p3.no/"
 ```
 
+## Code style
+The source code (`nrk-tv-downloader.sh`) is formatted with [shfmt](https://github.com/mvdan/sh). To format the code, run:
+
+```bash
+$ shfmt -l -w nrk-tv-downloader.sh
+```
+
 ## Requirements
 This script requires bash, rev, cut, grep, sed, gawk, printf, curl and ffmpeg/avconv.
 
