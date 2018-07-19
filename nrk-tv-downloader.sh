@@ -485,8 +485,8 @@ function program() {
 	local url="$1"
 
 	local html=$(curl $CURL_ -L "$url")
-	local program_id=$(gethtmlMeta "$html" 'og:url' |
-		sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
+	local program_id=$(
+		parsejson "$html" "prfId"
 	)
 	if [ -z "$program_id" ]; then
 		# Super uses another format
@@ -499,9 +499,11 @@ function program() {
 
 	fi
 
+	program_id=$(echo $program_id | awk '{print $1;}')
+
 	# Fetch the info with the v8-API
 	local v8=$(curl $CURL_ \
-		"http://v8.psapi.nrk.no/mediaelement/${program_id}")
+		"https://psapi-we.nrk.no/mediaelement/${program_id}")
 
 	local streams=$(parsejson "$v8" "url")
 
