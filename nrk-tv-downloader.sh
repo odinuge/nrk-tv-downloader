@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2155
 #
 # nrk-tv-downloader
 #
@@ -27,21 +28,25 @@ fi
 
 # Checking dependencies
 for dep in $DEPS; do
-	hash "$dep" 2>/dev/null
-	if [ $? -ne 0 ]; then
+	if ! hash "$dep" 2>/dev/null; then
 		echo -e "Error: Required program could not be found: $dep"
 		exit 1
 	fi
 done
 
+if ! hash "jq" 2>/dev/null; then
+	echo -e "Error: Required program could not be found: jq"
+	echo -e "jq is used for json-parsing. Download here: https://stedolan.github.io/jq/"
+	exit 1
+fi
+
 SUB_DOWNLOADER=false
 
 # Check for sub-downloader
-hash "tt-to-subrip" 2>/dev/null
-if [ $? -ne 0 ]; then
+if ! hash "tt-to-subrip" 2>/dev/null; then
 	DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 	if [ -f "$DIR/tt-to-subrip/tt-to-subrip.awk" ]; then
-		alias "tt-to-subrip=$DIR/tt-to-subrip/tt-to-subrip.awk"
+		alias tt-to-subrip='${DIR}/tt-to-subrip/tt-to-subrip.awk'
 		readonly SUB_DOWNLOADER=true
 	fi
 else
@@ -155,11 +160,11 @@ function is_tv_or_radio() {
 # Get a more human readable representation of $1 seconds
 function sec_to_human_readable() {
 	local INPUT_S=$1
-	local H=$((INPUT_S/60/60))
-	local M=$((INPUT_S/60 % 60))
+	local H=$((INPUT_S / 60 / 60))
+	local M=$((INPUT_S / 60 % 60))
 	local S=$((INPUT_S % 60))
-	(($H > 0)) && printf '%d hours ' $H
-	(($M > 0)) && printf '%d minutes ' $M && return
+	((H > 0)) && printf '%d hours ' $H
+	((M > 0)) && printf '%d minutes ' $M && return
 	printf '%d seconds' $S
 }
 
@@ -210,13 +215,11 @@ function download() {
 	fi
 
 	# Start timer
-	local t
-	t=$(timer)
+	local t=$(timer)
 
 	# Get the length
 	local probe_info
-	probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null)
-	if [ $? -ne 0 ]; then
+	if ! probe_info=$($PROBE_BIN -v quiet -show_format "$stream" 2>/dev/null); then
 		printf " - %s program is %s: %s\n\n" \
 			"$(is_tv_or_radio)" \
 			"$(print_red "not available")" \
@@ -253,7 +256,7 @@ function download() {
 				"$(print_red "Error")"
 			rm "$localfile" 2>/dev/null
 			return
-		elif [[ $line != *bitrate\=* || $line != *speed\=* ]]; then
+		elif [[ $line != *bitrate=* && $line != *speed=* ]]; then
 			$is_newline || echo && is_newline=true
 			printf " - %s %s" \
 				"$(print_red "${DOWNLOADER_BIN} error")" \
@@ -264,17 +267,19 @@ function download() {
 		is_newline=false
 
 		# Bitrate of source in Kbit/s
-		local bitrate="$(echo "$line" |
-			gawk '/bitrate=/{print}' |
-			sed -E 's/^.*bitrate= *([0-9]+).*$/\1/g'
+		local bitrate="$(
+			echo "$line" |
+				gawk '/bitrate=/{print}' |
+				sed -E 's/^.*bitrate= *([0-9]+).*$/\1/g'
 		)"
 
 		# Speed relative to video "speed"
 		# Eg. speed=5 -> 5x -> 5 times faster downloading
 		# than the speed of the video
-		local speed="$(echo "$line" |
-			gawk '/speed=/{print}' |
-			sed -E 's/^.*speed= *([0-9.]+).+$/\1/'
+		local speed="$(
+			echo "$line" |
+				gawk '/speed=/{print}' |
+				sed -E 's/^.*speed= *([0-9.]+).+$/\1/'
 		)"
 
 		# Downloadspeed in Mbit/s
@@ -303,12 +308,14 @@ function download() {
 			"$length_stamp" \
 			"$percent_dl" \
 			"$dl_speed" \
-			"$(sec_to_human_readable $eta)"
+			"$(sec_to_human_readable "$eta")"
 
-	done < <($DOWNLOADER_BIN -i "$stream" \
-		$downloader_params \
-		-y "$localfile" 2>&1 ||
-		echo -e "\rReturncode$?\r")
+	done < <(
+		# shellcheck disable=SC2086
+		$DOWNLOADER_BIN -i "$stream" $downloader_params \
+			-y "$localfile" 2>&1 ||
+			echo -e "\rReturncode$?\r"
+	)
 
 	printf '\r - Status: %s of %s - %s%%, %s Mbit/s - ETA: %s   \n' \
 		"$length_stamp" \
@@ -326,6 +333,7 @@ function download() {
 function parsejson() {
 	local json=$1
 	local tag=$2
+	# shellcheck disable=SC2016
 	local fnc='
     BEGIN{
         RS="{\"|,\"";
@@ -339,47 +347,13 @@ function parsejson() {
 	echo "$json" | gawk "$fnc"
 }
 
-# Get an attribute from a html tag
-function gethtmlAttr() {
-	local html=$1
-	local hint=$2
-	local attr=$3
-	local fnc='
-    /hint/ {
-        gsub( ".*attr=\"", "" );
-        gsub( "\".*", "" );
-        print;
-    }'
-	fnc=${fnc/hint/$hint}
-	fnc=${fnc/attr/$attr}
-	echo "$html" | gawk "${fnc}" RS="[<>]"
-}
-
-# Get the content of a meta tag
-function gethtmlMeta() {
-	local html=$1
-	local name=$2
-	gethtmlAttr "$html" "meta name=\"$name\"" "content"
-	gethtmlAttr "$html" "meta property=\"$name\"" "content"
-}
-
-# Get the content inside a html-Tag
-function gethtmlContent() {
-	local html=$1
-	local hint=$2
-	local fnc='/hint/{
-        gsub(".*>","");
-        $1=$1;
-        print;
-        exit;
-    }'
-	echo "$html" | gawk "${fnc/hint/$hint}" RS="<" ORS=""
-}
-
 # Get the stream with the best quality
 function getBestStream() {
 	local master=$1
-	local master_html=$(curl $CURL_ "$master")
+	local master_html
+	# shellcheck disable=SC2086
+	master_html=$(curl $CURL_ "$master")
+	# shellcheck disable=SC2016
 	local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
         match($0, /(http.*$|index.*[^\n])/, url);
@@ -407,9 +381,9 @@ function getBestStream() {
 
 	# Some links are absolute, and some links are relative
 	if [[ "$new_stream" == "http"* ]]; then
-		echo $new_stream
+		echo "$new_stream"
 	else
-		echo ${master//master.m3u8/"$new_stream"}
+		echo "${master//master.m3u8/"$new_stream"}"
 	fi
 }
 
@@ -417,27 +391,27 @@ function getBestStream() {
 function program_all() {
 	local url=$1
 	local ONLY_CURRENT=$SEASON
-	local html=$(curl $CURL_ "$url")
-	local program_id=$(gethtmlMeta "$html" 'og:url' |
-		sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
-	)
-	local series_name=$(gethtmlMeta "$html" 'og:url' |
-		sed -E 's/.*serie\/([^/]+).*/\1/'
-	)
+	local html
+	# shellcheck disable=SC2086
+	html="$(curl $CURL_ "$url")"
+
+	program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+
+	# shellcheck disable=SC2086
+	local v8=$(curl $CURL_ \
+		"http://psapi3-webapp-stage-we.azurewebsites.net/programs/${program_id}")
+
+	local series_id=$(parsejson "$v8" "seriesId")
+
+	# shellcheck disable=SC2086
+	local series_data=$(curl $CURL_ \
+		"http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}")
+
+	local series_title=$(echo "$v8" | jq -r ".seriesTitle")
 	if $ONLY_CURRENT; then
-		seasons=$(gethtmlMeta "$html" 'seasonid')
-		if [[ -z $seasons ]]; then
-			seasons=$(gethtmlAttr "$html" "seasontabs" "data-module-settings" |
-				sed -E "s/.*([0-9]{5}).*/\1/"
-			)
-		fi
+		seasons=$(echo "$v8" | jq -r ".seasonId")
 	else
-		seasons=$(gethtmlAttr "$html" "data-season" "data-season")
-		if [[ -z $seasons ]]; then
-			seasons=$(gethtmlAttr "$html" "season-episodes" "id" |
-				sed -E "s/.*([0-9]{5}).*/\1/"
-			)
-		fi
+		seasons=$(echo "$series_data" | jq -r ".seasons[] | .id")
 	fi
 	if [[ -z $seasons ]]; then
 		printf "Unable to download. Found no seasons."
@@ -446,35 +420,29 @@ function program_all() {
 
 	if ! $ONLY_CURRENT; then
 		printf 'Available seasons of "%s": %s\n' \
-			"$series_name" \
-			"$(echo $seasons | wc -w)"
+			"$series_title" \
+			"$(echo "$seasons" | wc -w)"
 	fi
 	# Loop through all seasons, or just the selected one
 	for season in $seasons; do
-		local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
-		if [ "$season" = "extra" ]; then
-			url="https://tv.nrk.no/extramaterial/$series_name"
-		fi
-		local s_html=$(curl $CURL_ "$url")
-
-		# Find only episodes with program-rights
-		# will match lines in awk like `/episode-item/ && !/no-rights/ {}`
-		local episodes=$(gethtmlAttr "$s_html" "episode-item/ && !/no-rights" "data-episode")
-		local season_name=$(gethtmlContent "$s_html" "h1>")
+		# shellcheck disable=SC2086
+		local s_html=$(curl $CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
+		local episodes=$(echo "$s_html" | jq -r ".[] | .id")
+		local season_name=$(echo "$s_html" | jq -r ".[1] | .seasonNumber")
 
 		if [ "$season" = "extra" ]; then
 			season_name="extramaterial"
 		fi
 		printf 'Available episodes in "%s": %s\n' \
 			"$season_name" \
-			"$(echo $episodes | wc -w)"
+			"$(echo "$episodes" | wc -w)"
 
 		if $DRY_RUN; then
 			continue
 		fi
 		# loop through all the episodes
 		for episode in $episodes; do
-			program "https://tv.nrk.no/serie/$series_name/$episode"
+			program "https://tv.nrk.no/serie/$series_id/$episode"
 		done
 
 	done
@@ -484,28 +452,20 @@ function program_all() {
 function program() {
 	local url="$1"
 
+	# shellcheck disable=SC2086
 	local html=$(curl $CURL_ -L "$url")
-	local program_id=$(
-		parsejson "$html" "prfId"
-	)
-	if [ -z "$program_id" ]; then
-		# Super uses another format
-		program_id=$(
-			gethtmlAttr \
-				"$html" \
-				"data-ludo-media-id" \
-				"data-ludo-media-id"
-		)
-
-	fi
-
-	program_id=$(echo $program_id | awk '{print $1;}')
+	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
 
 	# Fetch the info with the v8-API
+	# shellcheck disable=SC2086
 	local v8=$(curl $CURL_ \
 		"https://psapi-we.nrk.no/mediaelement/${program_id}")
 
-	local streams=$(parsejson "$v8" "url")
+	local assets=$(echo "$v8" | jq -r ".mediaAssets")
+	local streams
+	if [ "$assets" != "null" ]; then
+		streams=$(echo "$v8" | jq -r ".mediaAssets[]|.url") 2>/dev/null
+	fi
 
 	local title=$(parsejson "$v8" "fullTitle")
 	local series_title=$(parsejson "$v8" "seriesTitle")
@@ -515,7 +475,7 @@ function program() {
 	local episode=""
 
 	# Figure out title and local filename format
-	if $EPISODE_FORMAT && [ $(parsejson "$v8" "mediaElementType") == "Episode" ]; then
+	if "$EPISODE_FORMAT" && [ "$(parsejson "$v8" "mediaElementType")" == "Episode" ]; then
 		# Episode format enabled and available
 
 		local ep_num_or_date=$(parsejson "$v8" "episodeNumberOrDate")
@@ -523,11 +483,11 @@ function program() {
 
 		if [[ $ep_num_or_date == *":"* ]]; then #season epsiode format
 			local season_prefix="sesong-"
-			local arr_episode_format=(${ep_num_or_date//:/ })
+			local arr_episode_format=("${ep_num_or_date//:/ }")
 			season=$(parsejson "$v8" "relativeOriginUrl" |
 				gawk '/sesong/{printf("%s", $0)}' RS='/')
 
-			season=$(printf "%02d" ${season#$season_prefix})
+			season=$(printf "%02d" "${season#$season_prefix}")
 			episode="$(printf "%02d" "${arr_episode_format[0]}")"
 			season_ep_format="S${season}E${episode}"
 		else
@@ -547,8 +507,7 @@ function program() {
 	printf 'Program "%s"\n' "$title"
 
 	if [[ -z $streams || ! "$streams" == *"http"* ]]; then
-		local message
-		message=$(parsejson "$v8" "messageType" |
+		local message=$(parsejson "$v8" "messageType" |
 			gawk '{gsub("[A-Z]"," &");print tolower($0)}')
 		printf " - %s program is %s: %s\n\n" \
 			"$(is_tv_or_radio)" \
@@ -561,7 +520,7 @@ function program() {
 	local localfolder="$TARGET_PATH/"
 	mkdir -p "$localfolder" # create if not exists
 
-	if $EPISODE_FORMAT && $EPISODE_FOLDERS && [ $(parsejson "$v8" "mediaElementType") == "Episode" ]; then
+	if "$EPISODE_FORMAT" && "$EPISODE_FOLDERS" && [ "$(parsejson "$v8" "mediaElementType")" == "Episode" ]; then
 		local series_folder="${localfolder}${series_title}"
 		mkdir -p "$series_folder"
 		series_folder="${series_folder}/Season ${season}"
@@ -583,6 +542,7 @@ function program() {
 
 		if [ "$subtitle" == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN; then
 			echo " - Downloading subtitle"
+			# shellcheck disable=SC2086
 			curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" |
 				tt-to-subrip >"$localfile.srt"
 		elif $SUB_DOWNLOADER && ! $IS_RADIO; then
@@ -596,8 +556,7 @@ function program() {
 		fi
 	fi
 
-	local num_streams
-	num_streams=$(echo "$streams" | wc -w)
+	local num_streams=$(echo "$streams" | wc -w)
 	local part=0
 
 	# Download the stream(s)
@@ -653,12 +612,13 @@ function main() {
 		q)
 			SELECT_QUALITY=true
 			;;
-		t) if [ -z "$OPTARG" ]; then
-			usage
-			exit 0
-		else
-			TARGET_PATH="$OPTARG"
-		fi
+		t)
+			if [ -z "$OPTARG" ]; then
+				usage
+				exit 0
+			else
+				TARGET_PATH="$OPTARG"
+			fi
 			;;
 		a)
 			DL_ALL=true
@@ -667,6 +627,7 @@ function main() {
 			DL_ALL=true
 			SEASON=true
 			;;
+		*) ;;
 		esac
 	done
 

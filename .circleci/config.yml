@@ -1,7 +1,7 @@
 ---
 version: 2
 jobs:
-  build:
+  shfmt:
     docker:
       - image: odinuge/shfmt:latest
     steps:
@@ -9,3 +9,18 @@ jobs:
       - run:
           name: shfmt
           command: shfmt -l -d nrk-tv-downloader.sh
+  shellcheck:
+    docker:
+      - image: koalaman/shellcheck-alpine:latest
+    steps:
+      - checkout
+      - run:
+          name: shellcheck
+          command: shellcheck nrk-tv-downloader.sh
+
+workflows:
+  version: 2
+  on_push:
+    jobs:
+      - shfmt
+      - shellcheck
