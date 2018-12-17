@@ -34,6 +34,13 @@ for dep in $DEPS; do
 	fi
 done
 
+hash "jq" 2>/dev/null
+if [ $? -ne 0 ]; then
+	echo -e "Error: Required program could not be found: jq"
+	echo -e "jq is used for json-parsing. Download here: https://stedolan.github.io/jq/"
+	exit 1
+fi
+
 SUB_DOWNLOADER=false
 
 # Check for sub-downloader
@@ -155,8 +162,8 @@ function is_tv_or_radio() {
 # Get a more human readable representation of $1 seconds
 function sec_to_human_readable() {
 	local INPUT_S=$1
-	local H=$((INPUT_S/60/60))
-	local M=$((INPUT_S/60 % 60))
+	local H=$((INPUT_S / 60 / 60))
+	local M=$((INPUT_S / 60 % 60))
 	local S=$((INPUT_S % 60))
 	(($H > 0)) && printf '%d hours ' $H
 	(($M > 0)) && printf '%d minutes ' $M && return
@@ -339,43 +346,6 @@ function parsejson() {
 	echo "$json" | gawk "$fnc"
 }
 
-# Get an attribute from a html tag
-function gethtmlAttr() {
-	local html=$1
-	local hint=$2
-	local attr=$3
-	local fnc='
-    /hint/ {
-        gsub( ".*attr=\"", "" );
-        gsub( "\".*", "" );
-        print;
-    }'
-	fnc=${fnc/hint/$hint}
-	fnc=${fnc/attr/$attr}
-	echo "$html" | gawk "${fnc}" RS="[<>]"
-}
-
-# Get the content of a meta tag
-function gethtmlMeta() {
-	local html=$1
-	local name=$2
-	gethtmlAttr "$html" "meta name=\"$name\"" "content"
-	gethtmlAttr "$html" "meta property=\"$name\"" "content"
-}
-
-# Get the content inside a html-Tag
-function gethtmlContent() {
-	local html=$1
-	local hint=$2
-	local fnc='/hint/{
-        gsub(".*>","");
-        $1=$1;
-        print;
-        exit;
-    }'
-	echo "$html" | gawk "${fnc/hint/$hint}" RS="<" ORS=""
-}
-
 # Get the stream with the best quality
 function getBestStream() {
 	local master=$1
@@ -418,26 +388,22 @@ function program_all() {
 	local url=$1
 	local ONLY_CURRENT=$SEASON
 	local html=$(curl $CURL_ "$url")
-	local program_id=$(gethtmlMeta "$html" 'og:url' |
-		sed -E 's/.*([A-Z]{4}[0-9]{8}).*/\1/'
-	)
-	local series_name=$(gethtmlMeta "$html" 'og:url' |
-		sed -E 's/.*serie\/([^/]+).*/\1/'
-	)
+
+	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+
+	local v8=$(curl $CURL_ \
+		"http://psapi3-webapp-stage-we.azurewebsites.net/programs/${program_id}")
+
+	local series_id=$(parsejson "$v8" "seriesId")
+
+	local series_data=$(curl $CURL_ \
+		"http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}")
+
+	local series_title=$(echo "$v8" | jq -r ".seriesTitle")
 	if $ONLY_CURRENT; then
-		seasons=$(gethtmlMeta "$html" 'seasonid')
-		if [[ -z $seasons ]]; then
-			seasons=$(gethtmlAttr "$html" "seasontabs" "data-module-settings" |
-				sed -E "s/.*([0-9]{5}).*/\1/"
-			)
-		fi
+		seasons=$(echo "$v8" | jq -r ".seasonId")
 	else
-		seasons=$(gethtmlAttr "$html" "data-season" "data-season")
-		if [[ -z $seasons ]]; then
-			seasons=$(gethtmlAttr "$html" "season-episodes" "id" |
-				sed -E "s/.*([0-9]{5}).*/\1/"
-			)
-		fi
+		seasons=$(echo "$series_data" | jq -r ".seasons[] | .id")
 	fi
 	if [[ -z $seasons ]]; then
 		printf "Unable to download. Found no seasons."
@@ -446,21 +412,14 @@ function program_all() {
 
 	if ! $ONLY_CURRENT; then
 		printf 'Available seasons of "%s": %s\n' \
-			"$series_name" \
+			"$series_title" \
 			"$(echo $seasons | wc -w)"
 	fi
 	# Loop through all seasons, or just the selected one
 	for season in $seasons; do
-		local url="https://tv.nrk.no/program/Episodes/$series_name/$season"
-		if [ "$season" = "extra" ]; then
-			url="https://tv.nrk.no/extramaterial/$series_name"
-		fi
-		local s_html=$(curl $CURL_ "$url")
-
-		# Find only episodes with program-rights
-		# will match lines in awk like `/episode-item/ && !/no-rights/ {}`
-		local episodes=$(gethtmlAttr "$s_html" "episode-item/ && !/no-rights" "data-episode")
-		local season_name=$(gethtmlContent "$s_html" "h1>")
+		local s_html=$(curl $CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
+		local episodes=$(echo "$s_html" | jq -r ".[] | .id")
+		local season_name=$(echo "$s_html" | jq -r ".[1] | .seasonNumber")
 
 		if [ "$season" = "extra" ]; then
 			season_name="extramaterial"
@@ -474,7 +433,7 @@ function program_all() {
 		fi
 		# loop through all the episodes
 		for episode in $episodes; do
-			program "https://tv.nrk.no/serie/$series_name/$episode"
+			program "https://tv.nrk.no/serie/$series_id/$episode"
 		done
 
 	done
@@ -485,27 +444,17 @@ function program() {
 	local url="$1"
 
 	local html=$(curl $CURL_ -L "$url")
-	local program_id=$(
-		parsejson "$html" "prfId"
-	)
-	if [ -z "$program_id" ]; then
-		# Super uses another format
-		program_id=$(
-			gethtmlAttr \
-				"$html" \
-				"data-ludo-media-id" \
-				"data-ludo-media-id"
-		)
-
-	fi
-
-	program_id=$(echo $program_id | awk '{print $1;}')
+	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
 
 	# Fetch the info with the v8-API
 	local v8=$(curl $CURL_ \
 		"https://psapi-we.nrk.no/mediaelement/${program_id}")
 
-	local streams=$(parsejson "$v8" "url")
+	local assets=$(echo "$v8" | jq -r ".mediaAssets")
+	local streams
+	if [ "$assets" != "null" ]; then
+		streams=$(echo "$v8" | jq -r ".mediaAssets[]|.url") 2>/dev/null
+	fi
 
 	local title=$(parsejson "$v8" "fullTitle")
 	local series_title=$(parsejson "$v8" "seriesTitle")
