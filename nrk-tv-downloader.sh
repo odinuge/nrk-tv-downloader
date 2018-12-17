@@ -267,17 +267,19 @@ function download() {
 		is_newline=false
 
 		# Bitrate of source in Kbit/s
-		local bitrate="$(echo "$line" |
-			gawk '/bitrate=/{print}' |
-			sed -E 's/^.*bitrate= *([0-9]+).*$/\1/g'
+		local bitrate="$(
+			echo "$line" |
+				gawk '/bitrate=/{print}' |
+				sed -E 's/^.*bitrate= *([0-9]+).*$/\1/g'
 		)"
 
 		# Speed relative to video "speed"
 		# Eg. speed=5 -> 5x -> 5 times faster downloading
 		# than the speed of the video
-		local speed="$(echo "$line" |
-			gawk '/speed=/{print}' |
-			sed -E 's/^.*speed= *([0-9.]+).+$/\1/'
+		local speed="$(
+			echo "$line" |
+				gawk '/speed=/{print}' |
+				sed -E 's/^.*speed= *([0-9.]+).+$/\1/'
 		)"
 
 		# Downloadspeed in Mbit/s
@@ -610,12 +612,13 @@ function main() {
 		q)
 			SELECT_QUALITY=true
 			;;
-		t) if [ -z "$OPTARG" ]; then
-			usage
-			exit 0
-		else
-			TARGET_PATH="$OPTARG"
-		fi
+		t)
+			if [ -z "$OPTARG" ]; then
+				usage
+				exit 0
+			else
+				TARGET_PATH="$OPTARG"
+			fi
 			;;
 		a)
 			DL_ALL=true
