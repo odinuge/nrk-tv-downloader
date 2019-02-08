@@ -9,7 +9,7 @@
 #
 shopt -s expand_aliases
 
-DEPS="sed awk gawk printf curl cut grep rev"
+DEPS="sed gawk printf curl cut grep rev"
 DRY_RUN=false
 DOWNLOAD_SUBS=true
 EPISODE_FORMAT=false
@@ -283,7 +283,7 @@ function download() {
 		)"
 
 		# Downloadspeed in Mbit/s
-		local dl_speed=$(echo "$bitrate $speed" | awk '{printf("%.1f", $1*$2/1024)}')
+		local dl_speed=$(echo "$bitrate $speed" | gawk '{printf("%.1f", $1*$2/1024)}')
 		local curr_stamp="$(echo "$line" |
 			gawk -F "=" '/time=/{print}' RS=" ")"
 		if [[ $DOWNLOADER_BIN == "ffmpeg" ]]; then
@@ -301,7 +301,7 @@ function download() {
 		local percent_dl="$(((curr_s * 100) / length_sec))"
 
 		# Download ETA, estimated with the remaining time, and the dl speed
-		local eta=$(echo "$length_sec $curr_s $speed" | awk '{printf("%.0f", ($1-$2)/$3)}')
+		local eta=$(echo "$length_sec $curr_s $speed" | gawk '{printf("%.0f", ($1-$2)/$3)}')
 
 		printf '\r - Status: %s of %s - %s%%, %s Mbit/s - ETA: %s   ' \
 			"$curr_stamp" \
