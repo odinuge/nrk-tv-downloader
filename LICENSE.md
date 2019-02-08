@@ -1,7 +1,7 @@
 The MIT License (MIT)
 =====================
 
-Copyright © `2016` `Odin Ugedal <odin@ugedal.com>`
+Copyright © `2013 - 2019` `Odin Ugedal <odin@ugedal.com>`
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
