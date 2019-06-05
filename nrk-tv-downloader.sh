@@ -248,6 +248,10 @@ function download() {
 		downloader_params="-c copy -bsf:a aac_adtstoasc -stats -loglevel info"
 	fi
 
+	if [[ $DOWNLOADER_BIN == "avconv" ]]; then
+		downloader_params="$downloader_params --prefer-ffmpeg"
+	fi
+
 	while read -r -d "$(echo -e -n "\r")" line; do
 		line=$(echo "$line" | tr '\r' '\n')
 		if [[ $line =~ Returncode[1-9] ]]; then
