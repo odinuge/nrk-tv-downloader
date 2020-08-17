@@ -46,7 +46,7 @@ SUB_DOWNLOADER=false
 if ! hash "tt-to-subrip" 2>/dev/null; then
 	DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 	if [ -f "$DIR/tt-to-subrip/tt-to-subrip.awk" ]; then
-		alias tt-to-subrip='${DIR}/tt-to-subrip/tt-to-subrip.awk'
+		readonly TT_TO_SUBRIP="${DIR}/tt-to-subrip/tt-to-subrip.awk"
 		readonly SUB_DOWNLOADER=true
 	fi
 else
@@ -339,7 +339,7 @@ function parsejson() {
         RS="{\"|,\"";
         FS="\":";
     }
-    /tag\"\:/{
+    /tag":/{
         gsub("\"","",$2);
         print $2;
     }'
@@ -395,7 +395,7 @@ function program_all() {
 	# shellcheck disable=SC2086
 	html="$(curl $CURL_ "$url")"
 
-	program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+	program_id=$(echo "$html" | sed -n "s/^.*meta\ property=\"nrk:program-id\"\ content=\"\([^\"]*\).*$/\1/p")
 
 	# shellcheck disable=SC2086
 	local v8=$(curl $CURL_ \
@@ -544,7 +544,7 @@ function program() {
 			echo " - Downloading subtitle"
 			# shellcheck disable=SC2086
 			curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" |
-				tt-to-subrip >"$localfile.srt"
+				gawk -f "$TT_TO_SUBRIP" >"$localfile.srt"
 		elif $SUB_DOWNLOADER && ! $IS_RADIO; then
 			if [ "$subtitle" == "true" ]; then
 				printf " - Subtitle is %s\n" \
