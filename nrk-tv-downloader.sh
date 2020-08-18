@@ -173,6 +173,7 @@ function download() {
 
 	local stream=$1
 	local localfile=$2
+	local subtitle_file=$3
 
 	if [ -z "$stream" ]; then
 		echo -e "No stream provided"
@@ -246,6 +247,10 @@ function download() {
 		downloader_params="-codec:a libmp3lame -qscale:a 2 -loglevel info"
 	else
 		downloader_params="-c copy -bsf:a aac_adtstoasc -stats -loglevel info"
+	fi
+
+	if [ -f "$subtitle_file" ]; then
+		downloader_params="-i $subtitle_file $downloader_params -scodec mov_text -metadata:s:s:0 language=nor"
 	fi
 
 	while read -r -d "$(echo -e -n "\r")" line; do
@@ -529,6 +534,8 @@ function program() {
 	localfile="${localfile//:/-}"
 	localfile="$localfolder$localfile"
 
+	local subtitle_file
+
 	# Check if program has a valid subtitle (if downloading subs enabled)
 	if $DOWNLOAD_SUBS; then
 		local subtitle
@@ -536,9 +543,10 @@ function program() {
 
 		if [ "$subtitle" == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN; then
 			echo " - Downloading subtitle"
-			# shellcheck disable=SC2086
-			curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" |
-				gawk -f "$TT_TO_SUBRIP" >"$localfile.srt"
+			subtitle_file="$localfile.srt"
+			$CURL_ "http://psapi.nrk.no/programs/$program_id/subtitles/tt" |
+				gawk -f "$TT_TO_SUBRIP" >"$subtitle_file"
+
 		elif $SUB_DOWNLOADER && ! $IS_RADIO; then
 			if [ "$subtitle" == "true" ]; then
 				printf " - Subtitle is %s\n" \
@@ -570,7 +578,7 @@ function program() {
 		fi
 
 		# Download the stream
-		download "$stream" "$dl_file"
+		download "$stream" "$dl_file" "$subtitle_file"
 	done
 
 }
