@@ -18,7 +18,7 @@ SELECT_QUALITY=false
 TARGET_PATH="." # default to current folder unless specified
 
 # Curl flags (for making it silent)
-readonly CURL_="-s -L"
+readonly CURL_="curl -s -L"
 
 # Check the shell
 if [ -z "$BASH_VERSION" ]; then
@@ -351,8 +351,7 @@ function parsejson() {
 function getBestStream() {
 	local master=$1
 	local master_html
-	# shellcheck disable=SC2086
-	master_html=$(curl $CURL_ "$master")
+	master_html=$($CURL_ "$master")
 	# shellcheck disable=SC2016
 	local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
@@ -392,19 +391,16 @@ function program_all() {
 	local url=$1
 	local ONLY_CURRENT=$SEASON
 	local html
-	# shellcheck disable=SC2086
-	html="$(curl $CURL_ "$url")"
+	html="$($CURL_ "$url")"
 
 	program_id=$(echo "$html" | sed -n "s/^.*meta\ property=\"nrk:program-id\"\ content=\"\([^\"]*\).*$/\1/p")
 
-	# shellcheck disable=SC2086
-	local v8=$(curl $CURL_ \
+	local v8=$($CURL_ \
 		"http://psapi3-webapp-stage-we.azurewebsites.net/programs/${program_id}")
 
 	local series_id=$(parsejson "$v8" "seriesId")
 
-	# shellcheck disable=SC2086
-	local series_data=$(curl $CURL_ \
+	local series_data=$($CURL_ \
 		"http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}")
 
 	local series_title=$(echo "$v8" | jq -r ".seriesTitle")
@@ -425,8 +421,7 @@ function program_all() {
 	fi
 	# Loop through all seasons, or just the selected one
 	for season in $seasons; do
-		# shellcheck disable=SC2086
-		local s_html=$(curl $CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
+		local s_html=$($CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
 		local episodes=$(echo "$s_html" | jq -r ".[] | .id")
 		local season_name=$(echo "$s_html" | jq -r ".[1] | .seasonNumber")
 
@@ -457,8 +452,7 @@ function program() {
 	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
 
 	# Fetch the info with the v8-API
-	# shellcheck disable=SC2086
-	local v8=$(curl $CURL_ \
+	local v8=$($CURL_ \
 		"https://psapi-we.nrk.no/mediaelement/${program_id}")
 
 	local assets=$(echo "$v8" | jq -r ".mediaAssets")
