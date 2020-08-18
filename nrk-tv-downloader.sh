@@ -387,7 +387,7 @@ function getBestStream() {
 	if [[ "$new_stream" == "http"* ]]; then
 		echo "$new_stream"
 	else
-		echo "${master//master.m3u8/"$new_stream"}"
+		echo "${master//master.m3u8/${new_stream}}"
 	fi
 }
 
@@ -452,9 +452,13 @@ function program_all() {
 function program() {
 	local url="$1"
 
-	# shellcheck disable=SC2086
-	local html=$(curl $CURL_ -L "$url")
-	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+	local html=$($CURL_ -L "$url")
+	local program_id
+	program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+
+	if [ -z "$program_id" ]; then
+		program_id=$(echo "$html" | sed -n "s/^.*nrk:program-id\" content=\"\([^\"]*\).*$/\1/p")
+	fi
 
 	# Fetch the info with the v8-API
 	local v8=$($CURL_ \
