@@ -18,7 +18,7 @@ SELECT_QUALITY=false
 TARGET_PATH="." # default to current folder unless specified
 
 # Curl flags (for making it silent)
-readonly CURL_="-s -L"
+readonly CURL_="curl -s -L"
 
 # Check the shell
 if [ -z "$BASH_VERSION" ]; then
@@ -173,6 +173,7 @@ function download() {
 
 	local stream=$1
 	local localfile=$2
+	local subtitle_file=$3
 
 	if [ -z "$stream" ]; then
 		echo -e "No stream provided"
@@ -246,6 +247,10 @@ function download() {
 		downloader_params="-codec:a libmp3lame -qscale:a 2 -loglevel info"
 	else
 		downloader_params="-c copy -bsf:a aac_adtstoasc -stats -loglevel info"
+	fi
+
+	if [ -f "$subtitle_file" ]; then
+		downloader_params="-i $subtitle_file $downloader_params -scodec mov_text -metadata:s:s:0 language=nor"
 	fi
 
 	while read -r -d "$(echo -e -n "\r")" line; do
@@ -351,8 +356,7 @@ function parsejson() {
 function getBestStream() {
 	local master=$1
 	local master_html
-	# shellcheck disable=SC2086
-	master_html=$(curl $CURL_ "$master")
+	master_html=$($CURL_ "$master")
 	# shellcheck disable=SC2016
 	local fnc='/BANDWIDTH/{
         match($0, /BANDWIDTH=([0-9]*)/, bitrate);
@@ -383,7 +387,7 @@ function getBestStream() {
 	if [[ "$new_stream" == "http"* ]]; then
 		echo "$new_stream"
 	else
-		echo "${master//master.m3u8/"$new_stream"}"
+		echo "${master//master.m3u8/${new_stream}}"
 	fi
 }
 
@@ -392,19 +396,16 @@ function program_all() {
 	local url=$1
 	local ONLY_CURRENT=$SEASON
 	local html
-	# shellcheck disable=SC2086
-	html="$(curl $CURL_ "$url")"
+	html="$($CURL_ "$url")"
 
 	program_id=$(echo "$html" | sed -n "s/^.*meta\ property=\"nrk:program-id\"\ content=\"\([^\"]*\).*$/\1/p")
 
-	# shellcheck disable=SC2086
-	local v8=$(curl $CURL_ \
+	local v8=$($CURL_ \
 		"http://psapi3-webapp-stage-we.azurewebsites.net/programs/${program_id}")
 
 	local series_id=$(parsejson "$v8" "seriesId")
 
-	# shellcheck disable=SC2086
-	local series_data=$(curl $CURL_ \
+	local series_data=$($CURL_ \
 		"http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}")
 
 	local series_title=$(echo "$v8" | jq -r ".seriesTitle")
@@ -425,8 +426,7 @@ function program_all() {
 	fi
 	# Loop through all seasons, or just the selected one
 	for season in $seasons; do
-		# shellcheck disable=SC2086
-		local s_html=$(curl $CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
+		local s_html=$($CURL_ "http://psapi3-webapp-stage-we.azurewebsites.net/series/${series_id}/seasons/${season}/episodes")
 		local episodes=$(echo "$s_html" | jq -r ".[] | .id")
 		local season_name=$(echo "$s_html" | jq -r ".[1] | .seasonNumber")
 
@@ -452,13 +452,16 @@ function program_all() {
 function program() {
 	local url="$1"
 
-	# shellcheck disable=SC2086
-	local html=$(curl $CURL_ -L "$url")
-	local program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+	local html=$($CURL_ -L "$url")
+	local program_id
+	program_id=$(echo "$html" | sed -n "s/^.*data-program-id=\"\([^\"]*\).*$/\1/p")
+
+	if [ -z "$program_id" ]; then
+		program_id=$(echo "$html" | sed -n "s/^.*nrk:program-id\" content=\"\([^\"]*\).*$/\1/p")
+	fi
 
 	# Fetch the info with the v8-API
-	# shellcheck disable=SC2086
-	local v8=$(curl $CURL_ \
+	local v8=$($CURL_ \
 		"https://psapi-we.nrk.no/mediaelement/${program_id}")
 
 	local assets=$(echo "$v8" | jq -r ".mediaAssets")
@@ -535,6 +538,8 @@ function program() {
 	localfile="${localfile//:/-}"
 	localfile="$localfolder$localfile"
 
+	local subtitle_file
+
 	# Check if program has a valid subtitle (if downloading subs enabled)
 	if $DOWNLOAD_SUBS; then
 		local subtitle
@@ -542,9 +547,10 @@ function program() {
 
 		if [ "$subtitle" == "true" ] && $SUB_DOWNLOADER && ! $DRY_RUN; then
 			echo " - Downloading subtitle"
-			# shellcheck disable=SC2086
-			curl $CURL_ "http://v8.psapi.nrk.no/programs/$program_id/subtitles/tt" |
-				gawk -f "$TT_TO_SUBRIP" >"$localfile.srt"
+			subtitle_file="$localfile.srt"
+			$CURL_ "http://psapi.nrk.no/programs/$program_id/subtitles/tt" |
+				gawk -f "$TT_TO_SUBRIP" >"$subtitle_file"
+
 		elif $SUB_DOWNLOADER && ! $IS_RADIO; then
 			if [ "$subtitle" == "true" ]; then
 				printf " - Subtitle is %s\n" \
@@ -576,7 +582,7 @@ function program() {
 		fi
 
 		# Download the stream
-		download "$stream" "$dl_file"
+		download "$stream" "$dl_file" "$subtitle_file"
 	done
 
 }
