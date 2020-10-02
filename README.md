@@ -13,7 +13,7 @@ This script has nothing to do with NRK!
 
 ## Install
 ```bash
-git clone https://github.com/odinuge/nrk-tv-downloader/ --recursive
+git clone https://github.com/odinuge/nrk-tv-downloader --recursive
 ```
 
 ### Subtitles
