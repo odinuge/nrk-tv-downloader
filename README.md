@@ -59,7 +59,7 @@ $ shfmt -l -w nrk-tv-downloader.sh
 ```
 
 ## Requirements
-This script requires bash, rev, cut, grep, sed, gawk, printf, curl and ffmpeg/avconv.
+This script requires bash, rev, cut, grep, sed, gawk, printf, curl, ffmpeg/avconv and [jq](https://stedolan.github.io/jq/).
 
 ## License
 MIT © [Odin Ugedal](https://ugedal.com)
