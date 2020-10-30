@@ -618,10 +618,7 @@ function program_latest() {
         return
     fi
     local last_season_href=$(echo "$last_season" | jq -r '.href')
-
-    local url2="https://psapi-we.nrk.no${last_season_href}"
     local season_data=$($CURL_ "https://psapi-we.nrk.no${last_season_href}")
-
     local last_available_series=$(echo "$season_data" | jq '._embedded.episodes | map(. | select(.availability.status=="available")) | .[-1]')
     local last_episode_seqno=$(echo "$last_available_series" | jq '.sequenceNumber')
     local last_episode_url="${url}/sesong/${last_season_nr}/episode/${last_episode_seqno}"
@@ -632,7 +629,7 @@ function program_latest() {
     fi
 
     # Download last episode here
-    program $last_episode_url
+    program "$last_episode_url"
 }
 
 function main() {
