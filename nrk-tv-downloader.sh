@@ -131,7 +131,7 @@ function usage() {
 	echo -e "\nOptions:"
 	echo -e "\t -a download all episodes, in all seasons."
 	echo -e "\t -s download all episodes in season"
-    echo -e "\t -l download all episodes in season"
+	echo -e "\t -l download all episodes in season"
 	echo -e "\t -n skip files that exists"
 	echo -e "\t -d dry run - list what is possible to download"
 	echo -e "\t -u do not download subtitles"
@@ -587,11 +587,10 @@ function program() {
 	done
 }
 
-
 function program_latest() {
-    # This function find the latest available episode of the latest season,
-    # and downloads the episode
-    local url="$1"
+	# This function find the latest available episode of the latest season,
+	# and downloads the episode
+	local url="$1"
 
 	local html=$($CURL_ -L "$url")
 	local program_id
@@ -604,32 +603,32 @@ function program_latest() {
 	# Fetch the info with the v8-API
 	local v8=$($CURL_ "https://psapi-we.nrk.no/mediaelement/${program_id}")
 	local series_id=$(parsejson "$v8" "seriesId")
-    if [ -z "$series_id" ]; then
-        echo "Unable to find series"
-        return
-    fi
+	if [ -z "$series_id" ]; then
+		echo "Unable to find series"
+		return
+	fi
 
-    local series_data=$($CURL_ \
-        "https://psapi.nrk.no/tv/catalog/series/${series_id}")
-    local last_season=$(echo "$series_data" | jq '._links.seasons[-1]')
-    local last_season_nr=$(echo "$last_season" | jq -r '.name')
-    if [ -z "$last_season_nr" ]; then
-        echo "Unable to find season for series: ${series_id}"
-        return
-    fi
-    local last_season_href=$(echo "$last_season" | jq -r '.href')
-    local season_data=$($CURL_ "https://psapi-we.nrk.no${last_season_href}")
-    local last_available_series=$(echo "$season_data" | jq '._embedded.episodes | map(. | select(.availability.status=="available")) | .[-1]')
-    local last_episode_seqno=$(echo "$last_available_series" | jq '.sequenceNumber')
-    local last_episode_url="${url}/sesong/${last_season_nr}/episode/${last_episode_seqno}"
+	local series_data=$($CURL_ \
+		"https://psapi.nrk.no/tv/catalog/series/${series_id}")
+	local last_season=$(echo "$series_data" | jq '._links.seasons[-1]')
+	local last_season_nr=$(echo "$last_season" | jq -r '.name')
+	if [ -z "$last_season_nr" ]; then
+		echo "Unable to find season for series: ${series_id}"
+		return
+	fi
+	local last_season_href=$(echo "$last_season" | jq -r '.href')
+	local season_data=$($CURL_ "https://psapi-we.nrk.no${last_season_href}")
+	local last_available_series=$(echo "$season_data" | jq '._embedded.episodes | map(. | select(.availability.status=="available")) | .[-1]')
+	local last_episode_seqno=$(echo "$last_available_series" | jq '.sequenceNumber')
+	local last_episode_url="${url}/sesong/${last_season_nr}/episode/${last_episode_seqno}"
 
-    if [ -z "$last_episode_seqno" ]; then
-        echo "Unable to find episode"
-        return
-    fi
+	if [ -z "$last_episode_seqno" ]; then
+		echo "Unable to find episode"
+		return
+	fi
 
-    # Download last episode here
-    program "$last_episode_url"
+	# Download last episode here
+	program "$last_episode_url"
 }
 
 function main() {
@@ -679,9 +678,9 @@ function main() {
 			DL_ALL=true
 			SEASON=true
 			;;
-        l)
-            DL_LATEST=true
-            ;;
+		l)
+			DL_LATEST=true
+			;;
 		*) ;;
 		esac
 	done
@@ -703,8 +702,8 @@ function main() {
 
 			if $DL_ALL; then
 				program_all "$var"
-            elif $DL_LATEST; then
-                program_latest "$var"
+			elif $DL_LATEST; then
+				program_latest "$var"
 			else
 				program "$var"
 			fi
