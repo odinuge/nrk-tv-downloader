@@ -131,7 +131,7 @@ function usage() {
 	echo -e "\nOptions:"
 	echo -e "\t -a download all episodes, in all seasons."
 	echo -e "\t -s download all episodes in season"
-	echo -e "\t -l download all episodes in season"
+	echo -e "\t -l download the latest episode of a series"
 	echo -e "\t -n skip files that exists"
 	echo -e "\t -d dry run - list what is possible to download"
 	echo -e "\t -u do not download subtitles"
